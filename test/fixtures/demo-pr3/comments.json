@@ -1,0 +1,146 @@
+[
+  {
+    "id": 5725727,
+    "oldBlobId": "b9022d92b93bd40fe487eb0f03167a4ed00e6fff",
+    "newBlobId": "fbfa90ac7667975bb1f743c18cb9eff41f64fa08",
+    "filePath": "src/Code.ts",
+    "position": 22,
+    "content": "戻り値型の記載がされていない",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:27:18Z",
+    "updated": "2026-10-10T15:27:18Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725728,
+    "oldBlobId": null,
+    "newBlobId": null,
+    "filePath": null,
+    "position": null,
+    "content": "全体的にコーディング規約が揃っていないので、すべて見直すこと\n（これはソース上の場所を指定しない指摘）",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:28:12Z",
+    "updated": "2026-10-10T15:28:12Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725732,
+    "oldBlobId": "b9022d92b93bd40fe487eb0f03167a4ed00e6fff",
+    "newBlobId": "fbfa90ac7667975bb1f743c18cb9eff41f64fa08",
+    "filePath": "src/Code.ts",
+    "position": 29,
+    "content": "28行目（ファイルの最終行）にコメントしてみる",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:40:21Z",
+    "updated": "2026-10-10T15:40:21Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725735,
+    "oldBlobId": "b9022d92b93bd40fe487eb0f03167a4ed00e6fff",
+    "newBlobId": "fbfa90ac7667975bb1f743c18cb9eff41f64fa08",
+    "filePath": "src/Code.ts",
+    "position": 1,
+    "content": "先頭行にコメントを追加してみた",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:43:48Z",
+    "updated": "2026-10-10T15:43:48Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725738,
+    "oldBlobId": "b9022d92b93bd40fe487eb0f03167a4ed00e6fff",
+    "newBlobId": "fbfa90ac7667975bb1f743c18cb9eff41f64fa08",
+    "filePath": "src/Code.ts",
+    "position": 4,
+    "content": "3行目（削除された * の行）にコメントを付けた",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:45:53Z",
+    "updated": "2026-10-10T15:45:53Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725739,
+    "oldBlobId": "b9022d92b93bd40fe487eb0f03167a4ed00e6fff",
+    "newBlobId": "fbfa90ac7667975bb1f743c18cb9eff41f64fa08",
+    "filePath": "src/Code.ts",
+    "position": 3,
+    "content": "削除された * の行にコメントを付けた",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:47:28Z",
+    "updated": "2026-10-10T15:47:28Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725743,
+    "oldBlobId": "22bf85216724a1f64f1eef72138b20048c7b49b2",
+    "newBlobId": "a0bce0e2cacf0cbb3abb08555418229678267298",
+    "filePath": "src/backlog-api.ts",
+    "position": 244,
+    "content": "2つ目のhunkの追加行（188行目）",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T15:56:41Z",
+    "updated": "2026-10-10T15:57:00Z",
+    "stars": [],
+    "notifications": []
+  },
+  {
+    "id": 5725744,
+    "oldBlobId": null,
+    "newBlobId": null,
+    "filePath": null,
+    "position": null,
+    "content": "🤖 自動対応 ↩️ RC-0 への返信（表示確認用のテストコメントです）\n> 引用の表示確認\n\n**状態**: ✅ 対応済み\n**場所**: `src/example.ts` L42（推定）\n**コミット**: abc1234\n\n| RC | 状態 | 場所 |\n|----|------|------|\n| RC-0 | ✅ fixed | src/example.ts L42 |\n\nこの下の行は HTML コメントです。画面に表示されなければ非表示になっています。\n<!-- review-bot hidden-marker-test -->\n\n`[review-bot root=0 reply-to=0 status=fixed]`",
+    "changeLog": [],
+    "createdUser": {
+      "id": 1001,
+      "userId": "reviewer-a",
+      "name": "Reviewer A"
+    },
+    "created": "2026-10-10T16:01:04Z",
+    "updated": "2026-10-10T16:01:04Z",
+    "stars": [],
+    "notifications": []
+  }
+]

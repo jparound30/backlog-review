@@ -1,0 +1,194 @@
+/**
+ * Backlog API関連の関数
+ */
+
+/**
+ * Fetches project list from Backlog API
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance (default: backlog.com)
+ * @returns Array of project objects or error object
+ */
+function getBacklogProjects(apiKey: string, domain?: string): BacklogProject[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the project list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-project-list/
+    const url = `https://${backlogDomain}/api/v2/projects?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const projects = JSON.parse(response.getContentText());
+    return projects;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching projects: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Saves the Backlog API key to user properties
+ * @param apiKey - The Backlog API key to save
+ */
+function saveApiKey(apiKey: string): void {
+  PropertiesService.getUserProperties().setProperty('backlogApiKey', apiKey);
+}
+
+/**
+ * Retrieves the Backlog API key from user properties
+ * @returns The saved API key or empty string if not found
+ */
+function getApiKey(): string {
+  return PropertiesService.getUserProperties().getProperty('backlogApiKey') || '';
+}
+
+/**
+ * Saves the Backlog domain to user properties
+ * @param domain - The Backlog domain to save
+ */
+function saveDomain(domain: string): void {
+  PropertiesService.getUserProperties().setProperty('backlogDomain', domain);
+}
+
+/**
+ * Retrieves the Backlog domain from user properties
+ * @returns The saved domain or empty string if not found
+ */
+function getDomain(): string {
+  return PropertiesService.getUserProperties().getProperty('backlogDomain') || '';
+}
+
+/**
+ * Fetches Git repositories for a specific Backlog project
+ * @param projectId - The ID of the Backlog project
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Array of repository objects or error object
+ */
+function getBacklogRepositories(projectId: string, apiKey: string, domain?: string): BacklogRepository[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the Git repositories list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-git-repositories/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const repositories = JSON.parse(response.getContentText());
+    return repositories;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching repositories: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Fetches pull requests for a specific Backlog repository
+ * @param projectId - The ID of the Backlog project
+ * @param repoId - The ID of the Git repository
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Array of pull request objects or error object
+ */
+function getBacklogPullRequests(projectId: string, repoId: string, apiKey: string, domain?: string): BacklogPullRequest[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the pull request list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-list/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories/${repoId}/pullRequests?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const pullRequests = JSON.parse(response.getContentText());
+    return pullRequests;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching pull requests: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Fetches comments for a specific pull request
+ * @param projectId - The ID of the Backlog project
+ * @param repoId - The ID of the Git repository
+ * @param pullRequestNumber - The Number of the pull request
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Array of pull request comment objects or error object
+ */
+function getBacklogPullRequestComments(projectId: string, repoId: string, pullRequestNumber: string, apiKey: string, domain?: string): BacklogPullRequestComment[] | BacklogError {
+  try {
+    const backlogDomain = domain || 'backlog.jp';
+
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-comment/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories/${repoId}/pullRequests/${pullRequestNumber}/comments?order=asc&apiKey=${apiKey}`;
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    return JSON.parse(response.getContentText()) as BacklogPullRequestComment[];
+  } catch (error) {
+    return {
+      error: `Error fetching pull request comments: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}

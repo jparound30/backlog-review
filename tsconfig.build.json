@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "skill/backlog-fix-review/scripts",
+    "rewriteRelativeImportExtensions": true,
+    "removeComments": false,
+    "sourceMap": false,
+    "declaration": false
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

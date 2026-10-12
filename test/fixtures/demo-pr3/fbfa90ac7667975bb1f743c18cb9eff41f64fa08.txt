@@ -1,0 +1,28 @@
+/**
+ * メインファイル
+ *
+ * このプロジェクトは以下のファイルに分割されています：
+ * - ui.ts: UIに関する関数
+ * - types.ts: 型定義
+ * - backlog-api.ts: Backlog APIに関連する関数
+ * - spreadsheet.ts: スプレッドシートへの書き込み処理
+ * - utils.ts: ユーティリティ関数
+ */
+
+/**
+ * プルリクエストのコメントを取得してスプレッドシートに出力する
+ * @param projectId - BacklogプロジェクトID
+ * @param repoId - GitリポジトリID
+ * @param pullRequestNumber - プルリクエスト番号
+ * @param apiKey - Backlog APIキー
+ * @param domain - Backlogドメイン（省略時はbacklog.jp）
+ * @returns 成功メッセージまたはエラーオブジェクト
+ */
+function outputPullRequestComments(projectId: string, repoId: string, pullRequestNumber: string, apiKey: string, domain?: string): { success: string } | BacklogError {
+  const result = getBacklogPullRequestComments(projectId, repoId, pullRequestNumber, apiKey, domain);
+  if ('error' in result) {
+    return result;
+  }
+  writePullRequestCommentsToSheet(result);
+  return { success: `Successfully output ${result.length} comments to the spreadsheet.` };
+}

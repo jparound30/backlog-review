@@ -1,0 +1,247 @@
+/**
+ * Backlog API関連の関数
+ */
+
+/**
+ * Fetches project list from Backlog API
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance (default: backlog.com)
+ * @returns Array of project objects or error object
+ */
+function getBacklogProjects(apiKey: string, domain?: string): BacklogProject[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the project list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-project-list/
+    const url = `https://${backlogDomain}/api/v2/projects?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const projects = JSON.parse(response.getContentText());
+    return projects;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching projects: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Saves the Backlog API key to user properties
+ * @param apiKey - The Backlog API key to save
+ */
+function saveApiKey(apiKey: string): void {
+  PropertiesService.getUserProperties().setProperty('backlogApiKey', apiKey);
+}
+
+/**
+ * Retrieves the Backlog API key from user properties
+ * @returns The saved API key or empty string if not found
+ */
+function getApiKey(): string {
+  return PropertiesService.getUserProperties().getProperty('backlogApiKey') || '';
+}
+
+/**
+ * Saves the Backlog domain to user properties
+ * @param domain - The Backlog domain to save
+ */
+function saveDomain(domain: string): void {
+  PropertiesService.getUserProperties().setProperty('backlogDomain', domain);
+}
+
+/**
+ * Retrieves the Backlog domain from user properties
+ * @returns The saved domain or empty string if not found
+ */
+function getDomain(): string {
+  return PropertiesService.getUserProperties().getProperty('backlogDomain') || '';
+}
+
+/**
+ * Fetches Git repositories for a specific Backlog project
+ * @param projectId - The ID of the Backlog project
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Array of repository objects or error object
+ */
+function getBacklogRepositories(projectId: string, apiKey: string, domain?: string): BacklogRepository[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the Git repositories list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-git-repositories/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const repositories = JSON.parse(response.getContentText());
+    return repositories;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching repositories: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Fetches pull requests for a specific Backlog repository
+ * @param projectId - The ID of the Backlog project
+ * @param repoId - The ID of the Git repository
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Array of pull request objects or error object
+ */
+function getBacklogPullRequests(projectId: string, repoId: string, apiKey: string, domain?: string): BacklogPullRequest[] | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the pull request list
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-list/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories/${repoId}/pullRequests?apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const pullRequests = JSON.parse(response.getContentText());
+    return pullRequests;
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching pull requests: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Fetches comments for a specific pull request and outputs them to the active spreadsheet
+ * @param projectId - The ID of the Backlog project
+ * @param repoId - The ID of the Git repository
+ * @param pullRequestNumber - The Number of the pull request
+ * @param apiKey - The Backlog API key
+ * @param domain - Optional domain for the Backlog instance
+ * @returns Success message or error object
+ */
+function getBacklogPullRequestComments(projectId: string, repoId: string, pullRequestNumber: string, apiKey: string, domain?: string): {
+  success: string
+} | BacklogError {
+  try {
+    // If a domain is not provided, use the default backlog.jp domain
+    const backlogDomain = domain || 'backlog.jp';
+
+    // Backlog API endpoint for getting the pull request comments
+    // According to the documentation: https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-comment/
+    const url = `https://${backlogDomain}/api/v2/projects/${projectId}/git/repositories/${repoId}/pullRequests/${pullRequestNumber}/comments?order=asc&apiKey=${apiKey}`;
+
+    // Make the HTTP request
+    const response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    // Check if the request was successful
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      return {
+        error: `API request failed with status code: ${responseCode}. ${response.getContentText()}`
+      };
+    }
+
+    // Parse the JSON response
+    const comments = JSON.parse(response.getContentText()) as BacklogPullRequestComment[];
+
+    // Get the active spreadsheet and sheet
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getActiveSheet();
+
+    // Clear the sheet
+    sheet.clear();
+
+    // Create headers
+    const header = ['指摘箇所', '指摘内容', '指摘者', '指摘日']
+    const columnWidths = [200, 600, 200, 200]; // A, B, C, D列の幅
+    columnWidths.forEach((width, index) => {
+      sheet.setColumnWidth(index + 1, width);
+    });
+    sheet.appendRow(header);
+
+    // Format the header row
+    const headerRange = sheet.getRange(1, 1, 1, header.length);
+    headerRange.setFontWeight('bold')
+      .setBackground('#f3f3f3');
+
+    // Add the comments data
+    for (let i = 0; i < comments.length; i++) {
+      const comment = comments[i];
+      const location = formatPullRequestCommentLocation(comment);
+      const content = formatPullRequestCommentContent(comment);
+      const date = new Date(comment.created);
+      const dateStr = date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate();
+      sheet.appendRow([
+        location,
+        content,
+        comment.createdUser.name,
+        dateStr
+      ]);
+    }
+
+    sheet.getRange(2, 1, comments.length, headerRange.getNumColumns())
+      .setVerticalAlignment("top")
+      .setHorizontalAlignment("left")
+      .setWrap(true)
+
+    // Auto-resize columns to fit the content
+    // sheet.autoResizeColumns(1, 4);
+
+    return {success: `Successfully output ${comments.length} comments to the spreadsheet.`};
+  } catch (error) {
+    // Handle any errors
+    return {
+      error: `Error fetching pull request comments: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
