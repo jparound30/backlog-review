@@ -298,7 +298,7 @@ export function assertSafeBranchName(name: string): void {
   }
 }
 
-async function refsOf(repoDir: string, pullRequest: BacklogPullRequest): Promise<Snapshot["refs"]> {
+export async function refsOf(repoDir: string, pullRequest: BacklogPullRequest): Promise<Snapshot["refs"]> {
   assertSafeBranchName(pullRequest.base);
   assertSafeBranchName(pullRequest.branch);
   const base = `origin/${pullRequest.base}`;

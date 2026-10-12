@@ -66,7 +66,7 @@ export async function loadState(path: string, pr: PullRequestRef): Promise<Local
  * シンボリックリンクを拒否する。`.review-state/` は対象リポジトリの中にあるため、
  * リンクをコミットされると、たどった先の任意のファイルを書き換えられてしまう（§6-1）
  */
-async function assertNotSymlink(path: string): Promise<void> {
+export async function assertNotSymlink(path: string): Promise<void> {
   try {
     if ((await lstat(path)).isSymbolicLink()) {
       throw new Error(`シンボリックリンクのため中止しました: ${path}`);

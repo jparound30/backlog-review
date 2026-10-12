@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "rootDir": "src",
-    "outDir": "skill/backlog-fix-review/scripts",
+    "outDir": "build/scripts",
     "rewriteRelativeImportExtensions": true,
     "removeComments": false,
     "sourceMap": false,

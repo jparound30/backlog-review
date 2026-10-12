@@ -1,6 +1,6 @@
 {
   "name": "backlog-fix-review-comments",
-  "version": "20261012.1.0",
+  "version": "20261012.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -8,13 +8,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "rm -rf skill/backlog-fix-review/scripts && tsc -p tsconfig.build.json && node tools/write-package-json.mjs",
+    "build": "rm -rf build && tsc -p tsconfig.build.json && node tools/build.mjs",
     "cli": "node skill/backlog-fix-review/scripts/cli.js",
     "typecheck": "tsc",
     "test": "node --test",
     "validate": "node tools/validate-skill.mjs",
     "check": "npm run typecheck && npm run build && npm run validate && npm test",
-    "pack": "npm run check && node tools/pack.mjs"
+    "pack": "npm run check && node tools/pack.mjs",
+    "review-cli": "node skill/backlog-review/scripts/review-cli.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

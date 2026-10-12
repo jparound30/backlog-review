@@ -27,7 +27,8 @@ export type ReplyMarker = { root: ItemKey; replyTo: number; status: ReplyStatus 
 const REPLY_MARKER = /^`\[review-bot root=(\d+)(?:#\d+)? reply-to=(\d+) status=([a-z_]+)\]`$/;
 const SUMMARY_MARKER = /^`\[review-bot summary\]`$/;
 
-function lastLine(content: string): string {
+/** 本文の最後の行（空行を除く）。マーカーはここにあるものだけ有効 */
+export function lastLine(content: string): string {
   const lines = content.split("\n").map((line) => line.trim());
   return lines.findLast((line) => line !== "") ?? "";
 }

@@ -40,7 +40,7 @@ export async function loadState(path, pr) {
  * シンボリックリンクを拒否する。`.review-state/` は対象リポジトリの中にあるため、
  * リンクをコミットされると、たどった先の任意のファイルを書き換えられてしまう（§6-1）
  */
-async function assertNotSymlink(path) {
+export async function assertNotSymlink(path) {
     try {
         if ((await lstat(path)).isSymbolicLink()) {
             throw new Error(`シンボリックリンクのため中止しました: ${path}`);

@@ -5,6 +5,7 @@ import { hasSummaryMarker, parseItemKey, parseReference, parseReplyMarker, } fro
  */
 export function buildThreads(comments, options) {
     const sorted = [...comments].sort((a, b) => a.id - b.id);
+    const commentById = new Map(sorted.map((c) => [c.id, c]));
     const roles = new Map();
     const warnings = [];
     const rootOf = new Map();
@@ -26,7 +27,7 @@ export function buildThreads(comments, options) {
             summaryCommentId ??= comment.id;
             continue;
         }
-        const marker = isMine ? parseReplyMarker(content) : null;
+        const marker = isMine || options.readOthersReplyMarkers ? parseReplyMarker(content) : null;
         if (marker) {
             roles.set(comment.id, "bot_reply");
             const key = parseItemKey(marker.root);
@@ -80,7 +81,7 @@ export function buildThreads(comments, options) {
         }
         const item = { key, rootId: thread.rootId, status, events: thread.events, lastHumanCommentId, lastBotReplyId };
         const firstReply = thread.events.find((e) => e.type === "bot_reply");
-        const firstReplyComment = firstReply && sorted.find((c) => c.id === firstReply.commentId);
+        const firstReplyComment = firstReply && commentById.get(firstReply.commentId);
         const editedAfterReply = firstReplyComment !== undefined && thread.root.updated !== thread.root.created && thread.root.updated > firstReplyComment.created;
         result.push({ rootId: thread.rootId, item, followUpIds: thread.followUpIds, editedAfterReply });
     }

@@ -637,3 +637,15 @@ describe("コミットの補助コマンド（commit, 改善案 A-5）", () => {
     }
   });
 });
+
+describe("interpret --file の読み込み先の制限（plan.md §6-1, 2026-10-12）", () => {
+  test("一時ディレクトリの外のファイルは読まず、JSON でないときも内容を出さない", async () => {
+    const ctx = { client: {} as never, repoDir: "/", stateRoot: "/", out: () => {} } as unknown as CommandContext;
+    await assert.rejects(interpretCommand(PR, "/etc/hostname", ctx), /一時ディレクトリか \.review-state\/ の下/);
+    const dir = await mkdtemp(join(tmpdir(), "bfr-interp-"));
+    const bad = join(dir, "bad.json");
+    await writeFile(bad, "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCDEF");
+    await assert.rejects(interpretCommand(PR, bad, ctx), (e: Error) => /JSON として読めません/.test(e.message) && !/ghp_/.test(e.message));
+    await rm(dir, { recursive: true, force: true });
+  });
+});

@@ -5,10 +5,16 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 
-const CLI = join(import.meta.dirname, "../skill/backlog-fix-review/scripts/cli.js");
+// 配布物の CLI（npm run build で生成）が、スキルのフォルダだけで動くこと
+const ENTRIES = [
+  { skill: "backlog-fix-review", entry: "cli.js" },
+  { skill: "backlog-review", entry: "review-cli.js" },
+];
 
-// 配布物の CLI（npm run build で生成）が単独で動くこと
-test("配布物の CLI が起動し、使い方を表示する", { skip: !existsSync(CLI) && "npm run build が必要" }, async () => {
-  const { stderr } = await promisify(execFile)(process.execPath, [CLI, "--help"]);
-  assert.match(stderr, /使い方: node <スキルのディレクトリ>\/scripts\/cli\.js/);
-});
+for (const { skill, entry } of ENTRIES) {
+  const cli = join(import.meta.dirname, "../skill", skill, "scripts", entry);
+  test(`${skill} の CLI が起動し、使い方を表示する`, { skip: !existsSync(cli) && "npm run build が必要" }, async () => {
+    const { stderr } = await promisify(execFile)(process.execPath, [cli, "--help"]);
+    assert.match(stderr, new RegExp(`使い方: node <スキルのディレクトリ>/scripts/${entry.replace(".", "\\.")}`));
+  });
+}

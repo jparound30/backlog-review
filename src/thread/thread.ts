@@ -51,6 +51,13 @@ export type BuildOptions = {
   myselfId: number;
   /** ローカルに保存した解釈（返信しない not_actionable の判定に使う。replyStatus が null なら返信しない） */
   interpretations?: Map<ItemKey, { replyStatus: ReplyStatus | null; lastHumanCommentId: number }>;
+  /**
+   * 他人の返信マーカーも「対応側の返信」として読む（レビューする側のスキルが使う, plan-review.md §4-3）。
+   * 対応側（既定の false）はマーカーを根拠に自動で動くので他人のマーカーを信用しないが、
+   * レビュー側は人間に見せるためだけに読み、投稿は利用者の確認を経るので、投稿者を限定しない。
+   * サマリーマーカーは常に自分のものだけ読む
+   */
+  readOthersReplyMarkers?: boolean;
 };
 
 /**
@@ -59,6 +66,7 @@ export type BuildOptions = {
  */
 export function buildThreads(comments: BacklogComment[], options: BuildOptions): BuildResult {
   const sorted = [...comments].sort((a, b) => a.id - b.id);
+  const commentById = new Map(sorted.map((c) => [c.id, c]));
   const roles = new Map<number, CommentRole>();
   const warnings: ThreadWarning[] = [];
   const rootOf = new Map<number, number>();
@@ -82,7 +90,7 @@ export function buildThreads(comments: BacklogComment[], options: BuildOptions):
       summaryCommentId ??= comment.id;
       continue;
     }
-    const marker = isMine ? parseReplyMarker(content) : null;
+    const marker = isMine || options.readOthersReplyMarkers ? parseReplyMarker(content) : null;
     if (marker) {
       roles.set(comment.id, "bot_reply");
       const key = parseItemKey(marker.root);
@@ -140,7 +148,7 @@ export function buildThreads(comments: BacklogComment[], options: BuildOptions):
     const item: Item = { key, rootId: thread.rootId, status, events: thread.events, lastHumanCommentId, lastBotReplyId };
 
     const firstReply = thread.events.find((e) => e.type === "bot_reply");
-    const firstReplyComment = firstReply && sorted.find((c) => c.id === firstReply.commentId);
+    const firstReplyComment = firstReply && commentById.get(firstReply.commentId);
     const editedAfterReply =
       firstReplyComment !== undefined && thread.root.updated !== thread.root.created && thread.root.updated > firstReplyComment.created;
 

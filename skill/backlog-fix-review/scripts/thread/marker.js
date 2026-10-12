@@ -15,7 +15,8 @@ export const label = (key) => `RC-${key}`;
 // 以前は指摘を分割して `root=12345#1` と書いていた。`#数字` は無視して root 全体への返信として読む（§4-1）
 const REPLY_MARKER = /^`\[review-bot root=(\d+)(?:#\d+)? reply-to=(\d+) status=([a-z_]+)\]`$/;
 const SUMMARY_MARKER = /^`\[review-bot summary\]`$/;
-function lastLine(content) {
+/** 本文の最後の行（空行を除く）。マーカーはここにあるものだけ有効 */
+export function lastLine(content) {
     const lines = content.split("\n").map((line) => line.trim());
     return lines.findLast((line) => line !== "") ?? "";
 }

@@ -182,7 +182,7 @@ export function assertSafeBranchName(name) {
         throw new Error(`ブランチ名に使えない文字が含まれているため中止しました: ${JSON.stringify(name)}`);
     }
 }
-async function refsOf(repoDir, pullRequest) {
+export async function refsOf(repoDir, pullRequest) {
     assertSafeBranchName(pullRequest.base);
     assertSafeBranchName(pullRequest.branch);
     const base = `origin/${pullRequest.base}`;

@@ -27,6 +27,22 @@ import {
   type SyncContext,
 } from "./sync.ts";
 import { isReplyStatus, label, parseItemKey, type ReplyStatus } from "./thread/marker.ts";
+import { parseFindingMarker } from "./review/finding.ts";
+
+/**
+ * レビューする側のスキル（backlog-review）が投稿した指摘の印（plan-review.md §2-1, §7-4）。
+ * 表示だけに使い、状態・ランク・返信の判定には使わない（他人のマーカーを信用しない §4-6 の原則を保つ）
+ */
+function autoReviewNote(content: string): string {
+  const marker = parseFindingMarker(content);
+  return marker ? `🤖 自動レビューの指摘（${marker.severity}）` : "";
+}
+
+/** 一覧の要約。自動レビューの指摘なら 1 行目の印ではなく `指摘:` の行を出す */
+function summaryLine(content: string): string {
+  if (!parseFindingMarker(content)) return content;
+  return content.split("\n").find((l) => l.startsWith("指摘:") || l.startsWith("質問:")) ?? content;
+}
 
 export type CommandContext = SyncContext & { client: BacklogClient; out: (line: string) => void };
 
@@ -69,7 +85,9 @@ export async function fetchCommand(pr: PullRequestRef, ctx: CommandContext, all 
     ctx.out(
       `  ${pad(item.label, 14)} ${pad(item.status, 14)} ${pad(item.root.author.name, 16)} ${shortLocation(item.root)}${mark}`,
     );
-    ctx.out(`      ${firstLine(item.followUps.at(-1)?.content ?? item.root.content, 70)}`);
+    ctx.out(`      ${firstLine(summaryLine(item.followUps.at(-1)?.content ?? item.root.content), 70)}`);
+    const auto = autoReviewNote(item.root.content);
+    if (auto) ctx.out(`      ${auto}`);
     // 回答を受けて open に戻った指摘は、前回の Bot の返信を踏まえて解釈し直す（§5-1 の 5）
     const lastReply = item.history.findLast((h) => h.status !== undefined);
     if (item.status === "open" && lastReply) {
@@ -166,7 +184,16 @@ function quoteBlock(text: string, maxLines = 30): string[] {
 
 /** §3-2 手順 2〜4: 解釈を検証してランクを決め、確認①の一覧を出す */
 export async function interpretCommand(pr: PullRequestRef, file: string, ctx: CommandContext): Promise<void> {
-  const { items: inputs, errors } = validateInterpretations(JSON.parse(await readFile(file, "utf8")));
+  // 解釈の JSON は、一時ディレクトリか .review-state/ の下の自分の .json だけ読む（誘導で手元のファイルを読まない）。
+  // JSON.parse のメッセージはファイルの内容の一部を含むので出さない
+  const real = await allowedWorkFile(file, ctx.stateRoot, [".json"], "解釈の JSON");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(real, "utf8"));
+  } catch {
+    throw new Error(`解釈の JSON を JSON として読めません: ${file}`);
+  }
+  const { items: inputs, errors } = validateInterpretations(parsed);
   if (errors.length > 0) throw new Error(`解釈の JSON に問題があります:\n${errors.map((e) => `  ${e}`).join("\n")}`);
 
   const { snapshot, state, fetched } = await sync(pr, ctx);
@@ -212,7 +239,8 @@ export async function interpretCommand(pr: PullRequestRef, file: string, ctx: Co
     listed.push(item.key);
     const multiple = interp.points.length > 1;
     const head = multiple ? `論点 ${interp.points.length} 件` : pointLabel(interp.points[0]);
-    ctx.out(`${String(++n).padStart(3)}. ${pad(item.label, 14)} ${pad(head, 14)} 返信: ${interp.replyStatus}  ランク: ${interp.rank ?? "-"}`);
+    const auto = autoReviewNote(item.root.content);
+    ctx.out(`${String(++n).padStart(3)}. ${pad(item.label, 14)} ${pad(head, 14)} 返信: ${interp.replyStatus}  ランク: ${interp.rank ?? "-"}${auto ? `  ${auto}` : ""}`);
     // 論点を書かずに落としていないかを利用者が見比べられるよう、元のコメントの全文を出す（R-5）
     ctx.out("       元のコメント:");
     for (const line of quoteBlock(item.root.content)) ctx.out(line);
@@ -288,7 +316,7 @@ const MAX_BODY_LENGTH = 4000;
  * コメントに誘導されて手元の秘密のファイル（~/.ssh/… など）を投稿しないよう、
  * 一時ディレクトリか `.review-state/` の下にある `.md` だけを受け付ける
  */
-async function allowedWorkFile(path: string, stateRoot: string, exts: string[], what: string): Promise<string> {
+export async function allowedWorkFile(path: string, stateRoot: string, exts: string[], what: string): Promise<string> {
   const real = await realpath(path);
   const roots = await Promise.all(
     [tmpdir(), join(stateRoot, STATE_DIR)].map((root) => realpath(root).catch(() => null)),
@@ -498,7 +526,8 @@ async function prepareReply(
     key,
     replyTo: item.replyToId,
     reviewerName: target.author.name,
-    quoteSource: target.content,
+    // 自動レビューの指摘なら、1 行目の印ではなく `指摘:` の行を引用する（plan-review.md §7-4）
+    quoteSource: summaryLine(target.content),
     status,
     location: replyLocation(item),
     body,
@@ -680,7 +709,7 @@ export async function summaryCommand(pr: PullRequestRef, post: boolean, ctx: Com
     snapshot.items.map((item) => ({
       key: item.key,
       reviewerName: item.root.author.name,
-      summary: firstLine(item.root.content, 30),
+      summary: firstLine(summaryLine(item.root.content), 30),
       status: item.status,
       location: replyLocation(item),
       commits: item.commits,
