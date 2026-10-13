@@ -200,7 +200,7 @@ describe("レビュー用の同期とスナップショット（§4-4）", () =>
     await reviewFetchCommand(PR, ctx());
     const text = out.join("\n");
     assert.match(text, /確認待ちの返信（レビュアーの番）: 1 件/);
-    assert.match(text, /RC-10 .*fixed .*🤖 自分の自動レビュー .*feature\.ts L1（📍）/);
+    assert.match(text, /RC-10 .*fixed .*🤖 自分の自動レビュー .*feature\.ts L1（本文の場所）/);
     assert.match(text, /返信 #11（user2） コミット: abc1234/);
     assert.match(text, /未対応（open）の指摘: 2 件/);
     assert.match(text, /RC-30 .*open .*🤖 他の自動レビュー/);
@@ -224,13 +224,13 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
     assert.match(validateFindings({}).errors[0], /配列/);
   });
 
-  test("書式: 1 行目・📍・指摘・期待・マーカー。@ と [review-bot は崩す", () => {
+  test("書式: 1 行目・場所・指摘・期待・マーカー。@ と [review-bot は崩す", () => {
     const body = formatFinding(validateFindings([{ ...base, background: "@user に聞いた [review-bot summary]" }]).findings[0]);
     assert.equal(
       body,
       [
-        "🤖 自動レビュー 🟠 warning",
-        "📍 `src/a.ts` L42",
+        ":computer: 自動レビュー :warning: warning",
+        "場所: `src/a.ts` L42",
         "指摘: 問題",
         "期待: こう直す",
         "背景: ＠user に聞いた ［review-bot summary]",
@@ -239,10 +239,10 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
       ].join("\n"),
     );
     const q = formatFinding(validateFindings([{ ...base, kind: "question", side: "old" }]).findings[0]);
-    assert.match(q, /📍 `src\/a\.ts` L42（変更前）\n質問: 問題\n確認したいこと: こう直す/);
+    assert.match(q, /場所: `src\/a\.ts` L42（変更前）\n質問: 問題\n確認したいこと: こう直す/);
   });
 
-  test("相互運用: 対応側は 📍 から場所を読み、新しい open の指摘として扱う。マーカーは返信・サマリーに一致しない", () => {
+  test("相互運用: 対応側は `場所:` から場所を読み、新しい open の指摘として扱う。マーカーは返信・サマリーに一致しない", () => {
     const body = formatFinding(validateFindings([base]).findings[0]);
     assert.deepEqual(parseBodyMarkers(body), [{ path: "src/a.ts", line: 42 }]);
     assert.equal(parseReference(body), null);
@@ -255,7 +255,7 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
 
   test("指摘なしのコメント", () => {
     const body = formatNoFindings({ fileCount: 3, baseCommit: "a".repeat(40), branchCommit: "b".repeat(40), base: "main", branch: "feature" });
-    assert.match(body, /^🤖 自動レビュー: 指摘はありません\n（レビューした範囲: 変更ファイル 3 件、main aaaaaaa … feature bbbbbbb）/);
+    assert.match(body, /^:computer: 自動レビュー: 指摘はありません\n（レビューした範囲: 変更ファイル 3 件、main aaaaaaa … feature bbbbbbb）/);
     assert.deepEqual(parseFindingMarker(body), { severity: "none" });
     assert.equal(parseReplyMarker(body), null);
   });
@@ -339,12 +339,12 @@ describe("draft / select / post（§4-5, §5）", () => {
   test("draft: 検証・警告・一覧", async () => {
     comments = [comment(10, THIRD, "📍 feature.ts L3\n人間の指摘")];
     const text = await draft([f1, f2, { path: "other.ts", line: 1, severity: "warning", title: "範囲外", kind: "question" }].slice(0, 2).concat([{ path: "base.ts", line: 3, severity: "warning", title: "範囲外のファイルではないが行", expected: "y" }]));
-    assert.match(text, /1\. 🔴 critical {2}指摘 .*feature\.ts L2/);
+    assert.match(text, /1\. :rotating_light: critical {2}指摘 .*feature\.ts L2/);
     assert.match(text, /指摘: l2 がまずい\n\s+期待: l2 を直す\n\s+根拠（投稿しない）: L2/);
     // 人間の指摘（feature.ts L3）と近い → 重複の警告
     assert.match(text, /⚠️ 既存の指摘 RC-10（open、user3）と同じ場所です/);
     // base.ts L1 は変更のない行
-    assert.match(text, /2\. 🔵 suggestion[\s\S]*?⚠️ PR で変更されていない行への指摘です/);
+    assert.match(text, /2\. :bulb: suggestion[\s\S]*?⚠️ PR で変更されていない行への指摘です/);
     assert.match(text, /件数: critical 1 \/ warning 1 \/ suggestion 1/);
 
     await assert.rejects(draft([{ ...f1, line: 99 }]), /行数（3）を超えています/);
@@ -360,13 +360,13 @@ describe("draft / select / post（§4-5, §5）", () => {
     await draft([f1, f2]);
     out.length = 0;
     await reviewSelectCommand(PR, "1", ctx());
-    assert.match(out.join("\n"), /1\. 投稿する +🔴 critical feature\.ts L2/);
+    assert.match(out.join("\n"), /1\. 投稿する +:rotating_light: critical feature\.ts L2/);
     assert.match(out.join("\n"), /2\. 投稿しない/);
 
     out.length = 0;
     await postCommand(PR, false, ctx());
     assert.equal(posted.length, 0);
-    assert.match(out.join("\n"), /--- 1\/1 feature\.ts L2 ---\n🤖 自動レビュー 🔴 critical\n📍 `feature\.ts` L2\n指摘: l2 がまずい\n期待: l2 を直す\n\n`\[review-bot finding severity=critical\]`/);
+    assert.match(out.join("\n"), /--- 1\/1 feature\.ts L2 ---\n:computer: 自動レビュー :rotating_light: critical\n場所: `feature\.ts` L2\n指摘: l2 がまずい\n期待: l2 を直す\n\n`\[review-bot finding severity=critical\]`/);
     assert.match(out.join("\n"), /下書きです/);
 
     out.length = 0;
@@ -417,7 +417,7 @@ describe("draft / select / post（§4-5, §5）", () => {
     await postCommand(PR, false, ctx());
     await postCommand(PR, true, ctx());
     assert.equal(posted.length, 1);
-    assert.match(posted[0], /^🤖 自動レビュー: 指摘はありません/);
+    assert.match(posted[0], /^:computer: 自動レビュー: 指摘はありません/);
     assert.match(posted[0], /`\[review-bot finding severity=none\]`$/);
   });
 
@@ -604,7 +604,7 @@ describe("再レビュー: verify / resolve（§4-6）", () => {
     comments = [finding(10), botReply(11, AUTHOR, 10, "fixed", "deadbee")];
     await assert.rejects(resolve([{ key: "RC-10", action: "resolve", bodyFile: ok }]), /手元にありません/);
     posted.length = 0;
-    assert.match(await resolve([{ key: "RC-10", action: "reopen", bodyFile: ok }]), /RC-10 🤖 自動レビュー: 確認しました/);
+    assert.match(await resolve([{ key: "RC-10", action: "reopen", bodyFile: ok }]), /RC-10 :computer: 自動レビュー: 確認しました/);
     comments = [finding(10), botReply(11, AUTHOR, 10, "fixed", fixSha.slice(0, 7))];
     await assert.rejects(resolve([{ key: "RC-10", action: "resolve", bodyFile: ok }], true), /確認②で表示した本文と投稿する本文が一致しません/);
     assert.equal(posted.length, 0);
@@ -620,9 +620,9 @@ describe("再レビュー: verify / resolve（§4-6）", () => {
     ];
     const draft = await resolve(batch);
     assert.equal(posted.length, 0);
-    assert.match(draft, /--- 1\/3 RC-10 解決（現在: fixed） ---\nRC-10 ✅ 🤖 自動レビュー: 修正を確認しました（＠author さん）/);
-    assert.match(draft, /--- 2\/3 RC-20 回答（現在: needs_info） ---\nRC-20 🤖 自動レビュー: createOrder の方です\n⚠️ 自分の指摘ではありません/);
-    assert.match(draft, /--- 3\/3 RC-30 再指摘（現在: wontfix） ---\nRC-30 🤖 自動レビュー: 見送ると困ります。\n理由: …/);
+    assert.match(draft, /--- 1\/3 RC-10 解決（現在: fixed） ---\nRC-10 ✅ :computer: 自動レビュー: 修正を確認しました（＠author さん）/);
+    assert.match(draft, /--- 2\/3 RC-20 回答（現在: needs_info） ---\nRC-20 :computer: 自動レビュー: createOrder の方です\n⚠️ 自分の指摘ではありません/);
+    assert.match(draft, /--- 3\/3 RC-30 再指摘（現在: wontfix） ---\nRC-30 :computer: 自動レビュー: 見送ると困ります。\n理由: …/);
     assert.match(draft, /下書きです/);
 
     await resolve(batch, true);

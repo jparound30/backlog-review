@@ -22,7 +22,7 @@
 |---|---|
 | `key` / `label` | 指摘のキー（コメント ID）と表示名 `RC-番号` |
 | `status` | `open`（未対応）/ `fixed` / `answered` / `needs_info` / `wontfix`（対応側が返信済み。レビュアーの番）/ `resolved`（完了）/ `not_actionable` |
-| `root` | 元のコメント。`content`（本文）・`author`・`location`（行コメントの位置。`filePath`・`line`・`side`・`outdated`・`currentLine`）・`bodyMarkers`（本文の `📍 path L42`） |
+| `root` | 元のコメント。`content`（本文）・`author`・`location`（行コメントの位置。`filePath`・`line`・`side`・`outdated`・`currentLine`）・`bodyMarkers`（本文の `場所: path L42`。以前の書式の `📍` を含む） |
 | `mine` | 自分（このスキル）が投稿した指摘か |
 | `finding` | 自分の指摘の重大度（`severity`）。他人のコメントでは null |
 | `othersFinding` | 他の人の自動レビューの印。参考にとどめる |
@@ -31,4 +31,4 @@
 | `awaitingReviewer` | レビュアーの番か |
 | `editedAfterReply` | 返信の後に元のコメントが編集されている |
 
-重複の判定に使うのは `root.location`（行コメント）と `root.bodyMarkers`（`📍`）。同じファイルの近い行（±3 行）に `resolved` 以外の指摘があれば、`draft` が警告する。
+重複の判定に使うのは `root.location`（行コメント）と `root.bodyMarkers`（`場所:`）。同じファイルの近い行（±3 行）に `resolved` 以外の指摘があれば、`draft` が警告する。

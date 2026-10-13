@@ -19,7 +19,7 @@ describe("formatReply", () => {
     assert.equal(
       reply,
       [
-        "🤖 自動対応 ↩️ RC-12345 への返信（tanaka さん）",
+        ":computer: 自動対応 ↩️ RC-12345 への返信（tanaka さん）",
         "> 例外を握りつぶしている",
         "",
         "**状態**: ✅ 対応済み",
@@ -138,7 +138,7 @@ describe("進み具合と次にすること（§4-5）", () => {
     const text = formatSummary([row("1", "fixed")]);
     const lines = text.split("\n");
     assert.equal(lines.at(-1), "`[review-bot summary]`");
-    assert.ok(text.indexOf("| RC |") < text.indexOf("**📝 次にすること**"));
+    assert.ok(text.indexOf("| RC |") < text.indexOf("**:memo: 次にすること**"));
     assert.match(text, /- 対応不要にする → `RC-番号 ✅ 対応不要`/);
     assert.ok(hasSummaryMarker(text));
   });

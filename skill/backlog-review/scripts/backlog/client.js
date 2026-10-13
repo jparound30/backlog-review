@@ -1,3 +1,4 @@
+import { replaceFourByteChars } from "../text.js";
 import { containsApiKey, findSecretPattern } from "./secrets.js";
 export { findSecretPattern } from "./secrets.js";
 const PAGE_SIZE = 100;
@@ -143,12 +144,15 @@ export class BacklogClient {
         if (secret)
             throw new Error(`投稿する本文に秘密情報らしき文字列（${secret}）があるため、投稿を中止しました`);
     }
-    async postComment(pr, content) {
+    /** 投稿・更新する本文。スペースによっては投稿できない 4 バイト文字を置き換える（plan.md §4-7） */
+    async postComment(pr, body) {
+        const content = replaceFourByteChars(body);
         this.assertSafeContent(content);
         return this.request("POST", this.buildUrl(`${this.pullRequestPath(pr)}/comments`), new URLSearchParams({ content }));
     }
     /** 認証ユーザー自身が投稿したコメントのみ更新できる */
-    async updateComment(pr, commentId, content) {
+    async updateComment(pr, commentId, body) {
+        const content = replaceFourByteChars(body);
         this.assertSafeContent(content);
         return this.request("PATCH", this.buildUrl(`${this.pullRequestPath(pr)}/comments/${commentId}`), new URLSearchParams({ content }));
     }

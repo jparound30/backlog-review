@@ -1,3 +1,4 @@
+import { replaceFourByteChars } from "../text.ts";
 import { containsApiKey, findSecretPattern } from "./secrets.ts";
 import type { BacklogComment, BacklogPullRequest, BacklogUser } from "./types.ts";
 
@@ -168,7 +169,9 @@ export class BacklogClient {
     if (secret) throw new Error(`投稿する本文に秘密情報らしき文字列（${secret}）があるため、投稿を中止しました`);
   }
 
-  async postComment(pr: PullRequestRef, content: string): Promise<BacklogComment> {
+  /** 投稿・更新する本文。スペースによっては投稿できない 4 バイト文字を置き換える（plan.md §4-7） */
+  async postComment(pr: PullRequestRef, body: string): Promise<BacklogComment> {
+    const content = replaceFourByteChars(body);
     this.assertSafeContent(content);
     return this.request(
       "POST",
@@ -178,7 +181,8 @@ export class BacklogClient {
   }
 
   /** 認証ユーザー自身が投稿したコメントのみ更新できる */
-  async updateComment(pr: PullRequestRef, commentId: number, content: string): Promise<BacklogComment> {
+  async updateComment(pr: PullRequestRef, commentId: number, body: string): Promise<BacklogComment> {
+    const content = replaceFourByteChars(body);
     this.assertSafeContent(content);
     return this.request(
       "PATCH",

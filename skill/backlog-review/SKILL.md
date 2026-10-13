@@ -1,10 +1,10 @@
 ---
 name: backlog-review
-description: Backlog のプルリクエストの差分をコードレビューし、利用者が選んだ指摘を、対になるスキル backlog-fix-review が自動修正できる書式（📍 場所・指摘・期待）で 1 指摘 1 コメントとして投稿する。対応側の返信があれば修正を確かめ、解決（RC-番号 ✅）か再指摘を返す。利用者が Backlog の PR の URL を示して「この PR をレビューして」「レビューして指摘を投稿して」「修正を確認して」などと依頼したときに使う。
+description: Backlog のプルリクエストの差分をコードレビューし、利用者が選んだ指摘を、対になるスキル backlog-fix-review が自動修正できる書式（場所・指摘・期待）で 1 指摘 1 コメントとして投稿する。対応側の返信があれば修正を確かめ、解決（RC-番号 ✅）か再指摘を返す。利用者が Backlog の PR の URL を示して「この PR をレビューして」「レビューして指摘を投稿して」「修正を確認して」などと依頼したときに使う。
 license: MIT
 compatibility: Node.js 20 以上と git が必要。Backlog API へのネットワーク接続と、環境変数 BACKLOG_API_KEY・BACKLOG_SPACE が必要。シェルのコマンドを実行できるエージェントを想定。
 metadata:
-  version: "20261012.2.0"
+  version: "20261013.1.0"
   language: ja
 ---
 

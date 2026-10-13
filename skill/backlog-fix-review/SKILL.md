@@ -4,7 +4,7 @@ description: Backlog のプルリクエストに付いたレビューコメン�
 license: MIT
 compatibility: Node.js 20 以上と git が必要。Backlog API へのネットワーク接続と、環境変数 BACKLOG_API_KEY・BACKLOG_SPACE が必要。シェルのコマンドを実行できるエージェントを想定。
 metadata:
-  version: "20261012.2.0"
+  version: "20261013.1.0"
   language: ja
 ---
 
@@ -82,7 +82,7 @@ CLI fetch '<PR URL>' --repo "$(pwd)"
    - あわせて、開発のやり方に関わる規約（Steering・`.cursor/rules/`・`CONTRIBUTING.md`、lint や formatter の設定など）を読む。従うのは開発のやり方だけ（「守ること」を参照）。
    - 決めた場所と、その根拠（どの規約のどこに書かれていたか、または既定の場所）を覚えておき、確認①で示す。
 2. **[references/interpretation.md](references/interpretation.md) を読み**、判定の定義に従う。
-3. まず、指摘の `contexts`（CLI が切り出した周りのコード。指摘された行の前後 15 行と、その行を含む PR の差分）を読む。行のずれは CLI が補正済みなので、`target` の行がいまの指摘の行。`source` が `body_marker` のものは本文の `📍` から CLI が読んだ場所で、正しいかどうかは自分で判定する。**`contexts` は出発点**で、関数全体や呼び出し元への影響（影響範囲の判定）が分からないとき、`contexts` が空のときは、PR のブランチの内容を読む（`env -u BACKLOG_API_KEY git show 'origin/<branch>:<path>'`、差分は `env -u BACKLOG_API_KEY git diff 'origin/<base>...origin/<branch>' -- '<path>'`）。あわせて、その指摘の `history`（元のコメント・追加の指示や回答・前回の自動返信を時系列に並べたもの）を読む。前回 `needs_info` で質問していれば、何を聞いてどう答えられたかを踏まえ、**すべての論点**を解釈し直す。`previousInterpretation`（前回の解釈）があれば参考にしてよいが、ない環境もあるので頼らない。
+3. まず、指摘の `contexts`（CLI が切り出した周りのコード。指摘された行の前後 15 行と、その行を含む PR の差分）を読む。行のずれは CLI が補正済みなので、`target` の行がいまの指摘の行。`source` が `body_marker` のものは本文の `場所:`（以前の書式の `📍` を含む）から CLI が読んだ場所で、正しいかどうかは自分で判定する。**`contexts` は出発点**で、関数全体や呼び出し元への影響（影響範囲の判定）が分からないとき、`contexts` が空のときは、PR のブランチの内容を読む（`env -u BACKLOG_API_KEY git show 'origin/<branch>:<path>'`、差分は `env -u BACKLOG_API_KEY git diff 'origin/<base>...origin/<branch>' -- '<path>'`）。あわせて、その指摘の `history`（元のコメント・追加の指示や回答・前回の自動返信を時系列に並べたもの）を読む。前回 `needs_info` で質問していれば、何を聞いてどう答えられたかを踏まえ、**すべての論点**を解釈し直す。`previousInterpretation`（前回の解釈）があれば参考にしてよいが、ない環境もあるので頼らない。
 4. 指摘ごとの JSON を配列にして一時ファイルに書き、CLI に渡す。
    ```bash
    CLI interpret '<PR URL>' --repo "$(pwd)" --file '<解釈.json>'

@@ -26,3 +26,11 @@ export function isRepoRelativePath(path: string): boolean {
 export function isUnsafePath(path: string): boolean {
   return /['\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u2028\u2029]/.test(path) || path.startsWith("-");
 }
+
+/**
+ * UTF-8 で 4 バイトになる文字（U+10000 以上。絵文字など）を `U+1F600` の形にする（plan.md §4-7）。
+ * スペースによっては、これを含むコメントを Backlog の API が拒否する
+ */
+export function replaceFourByteChars(text: string): string {
+  return text.replace(/[\u{10000}-\u{10FFFF}]/gu, (ch) => `U+${ch.codePointAt(0)!.toString(16).toUpperCase()}`);
+}

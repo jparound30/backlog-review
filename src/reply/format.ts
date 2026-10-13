@@ -1,12 +1,12 @@
-import { isRepoRelativePath, isUnsafePath } from "../text.ts";
+import { isRepoRelativePath, isUnsafePath, replaceFourByteChars } from "../text.ts";
 import { escapeQuoted, formatReplyMarker, parseReplyMarker, type ItemKey, label, neutralize, type ReplyStatus, SUMMARY_MARKER_TEXT } from "../thread/marker.ts";
 import type { ItemStatus } from "../thread/thread.ts";
 
 const STATUS_LABEL: Record<ReplyStatus, string> = {
   fixed: "✅ 対応済み",
-  answered: "💬 回答",
+  answered: ":speech_balloon: 回答",
   needs_info: "❓ 確認させてください",
-  wontfix: "🙅 対応を見送ります",
+  wontfix: ":no_good: 対応を見送ります",
 };
 
 /** 状態ごとに本文の見出しを変える */
@@ -20,9 +20,9 @@ const BODY_HEADING: Record<ReplyStatus, string> = {
 const SUMMARY_STATUS_LABEL: Record<ItemStatus, string> = {
   open: "⏳ open",
   fixed: "✅ fixed",
-  answered: "💬 answered",
+  answered: ":speech_balloon: answered",
   needs_info: "❓ needs_info",
-  wontfix: "🙅 wontfix",
+  wontfix: ":no_good: wontfix",
   not_actionable: "－",
   resolved: "☑️ resolved",
 };
@@ -72,7 +72,7 @@ export function formatLocation(location: ReplyLocation | null): string {
 /** Bot の返信（§4-3） */
 export function formatReply(input: ReplyInput): string {
   const lines = [
-    `🤖 自動対応 ↩️ ${label(input.key)} への返信（${escapeQuoted(input.reviewerName)} さん）`,
+    `:computer: 自動対応 ↩️ ${label(input.key)} への返信（${escapeQuoted(input.reviewerName)} さん）`,
     `> ${quoteLine(input.quoteSource) || "（本文なし）"}`,
     "",
     `**状態**: ${STATUS_LABEL[input.status]}`,
@@ -86,7 +86,8 @@ export function formatReply(input: ReplyInput): string {
     lines.push(`**コミット**: ${input.commits.map((sha) => sha.slice(0, 7)).join(", ")}`);
   }
   lines.push("", formatReplyMarker({ root: input.key, replyTo: input.replyTo, status: input.status }));
-  return lines.join("\n");
+  // 4 バイト文字は投稿の直前にも置き換わる（§4-7）。下書きで見せる本文を、投稿する本文とそろえる
+  return replaceFourByteChars(lines.join("\n"));
 }
 
 /**
@@ -140,14 +141,14 @@ function formatJst(date: Date): string {
 
 /** レビュアーが次にすること（§4-5）。表の「状態」列の値ごとに書く */
 export const NEXT_STEPS = [
-  "**📝 次にすること**（すべての指摘が ☑️ resolved になれば完了です。番号は上の表の RC 列。コメントの**先頭**に書く）",
+  "**:memo: 次にすること**（すべての指摘が ☑️ resolved になれば完了です。番号は上の表の RC 列。コメントの**先頭**に書く）",
   "- ⏳ open → 自動対応を待つ（レビュアーは何もしなくてよい）",
   "- ✅ fixed → 確認して問題なければ `RC-番号 ✅`、直っていなければ `RC-番号 理由`",
   "- ❓ needs_info → `RC-番号 回答` で答える",
-  "- 💬 answered / 🙅 wontfix → 納得なら `RC-番号 ✅`、そうでなければ `RC-番号 理由`",
+  "- :speech_balloon: answered / :no_good: wontfix → 納得なら `RC-番号 ✅`、そうでなければ `RC-番号 理由`",
   "- ☑️ resolved → 完了（何もしなくてよい）",
   "- 対応不要にする → `RC-番号 ✅ 対応不要`",
-  "- 新しく指摘する → 行コメントで付ける（または `📍 ファイル L行`）。1 コメントに 1 指摘",
+  "- 新しく指摘する → 行コメントで付ける（または `場所: ファイル L行`）。1 コメントに 1 指摘",
 ];
 
 /** 進み具合の 1 行（§4-5）。not_actionable を除いて数える */
@@ -162,7 +163,7 @@ export function formatProgress(statuses: ItemStatus[]): string {
 /** サマリーコメント（§4-5）。not_actionable は出さない */
 export function formatSummary(rows: SummaryRow[], now = new Date()): string {
   const visible = rows.filter((r) => r.status !== "not_actionable");
-  const lines = [`## 🤖 レビュー対応状況（最終更新: ${formatJst(now)}）`, ""];
+  const lines = [`## :computer: レビュー対応状況（最終更新: ${formatJst(now)}）`, ""];
   if (visible.length === 0) {
     lines.push("対応が必要な指摘はありません。");
   } else {
@@ -183,5 +184,5 @@ export function formatSummary(rows: SummaryRow[], now = new Date()): string {
   }
   // マーカーは最後の行でないと働かないので、「次にすること」はその前に置く（§6-1）
   lines.push("", ...NEXT_STEPS, "", SUMMARY_MARKER_TEXT);
-  return lines.join("\n");
+  return replaceFourByteChars(lines.join("\n"));
 }

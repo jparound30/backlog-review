@@ -3,7 +3,7 @@
  * 対応側の `parseReplyMarker` / `hasSummaryMarker` に一致しない形にし、対応側では通常の指摘として読まれる
  */
 import { createHash } from "node:crypto";
-import { isRepoRelativePath, isUnsafePath } from "../text.ts";
+import { isRepoRelativePath, isUnsafePath, replaceFourByteChars } from "../text.ts";
 import { lastLine, neutralize } from "../thread/marker.ts";
 
 /** 重大度。`none` は「指摘なし」のコメント（§2-3） */
@@ -15,9 +15,9 @@ export function isFindingSeverity(value: unknown): value is FindingSeverity {
 }
 
 export const SEVERITY_MARK: Record<FindingSeverity, string> = {
-  critical: "🔴 critical",
-  warning: "🟠 warning",
-  suggestion: "🔵 suggestion",
+  critical: ":rotating_light: critical",
+  warning: ":warning: warning",
+  suggestion: ":bulb: suggestion",
   none: "指摘なし",
 };
 
@@ -37,7 +37,7 @@ export function parseFindingMarker(content: string): FindingMarker | null {
 }
 
 /** 人間向けの 1 行目（§2-1） */
-export const FINDING_HEADLINE = "🤖 自動レビュー";
+export const FINDING_HEADLINE = ":computer: 自動レビュー";
 
 // ---- エージェントが書く JSON（§4-5）
 
@@ -80,7 +80,7 @@ function text(value: unknown, at: string, errors: string[], required: boolean): 
     return null;
   }
   if (trimmed.length > MAX_TEXT) errors.push(`${at} が長すぎます（${trimmed.length} 文字。上限 ${MAX_TEXT}）`);
-  // 1 文の項目。改行を許すと、投稿本文に `📍` や `期待:` の行を足せてしまう
+  // 1 文の項目。改行を許すと、投稿本文に `場所:` や `期待:` の行を足せてしまう
   if (/[\r\n]/.test(trimmed)) errors.push(`${at} に改行を含めないでください（1 文で書く）`);
   if (hasControl(trimmed)) errors.push(`${at} に制御文字や見えない文字が含まれています`);
   return trimmed;
@@ -99,8 +99,8 @@ export function validateFindings(data: unknown): { findings: FindingInput[]; err
     }
     const f = raw as Record<string, unknown>;
     const path = text(f.path, `${at}.path`, errors, true);
-    // バッククォートは `📍 \`path\`` の書式を壊し、対応側が別のパスを読む
-    // `./x` や `a//b` は、git の `<rev>:<path>` の解決と 📍 の照合でずれるので受け付けない
+    // バッククォートは `場所: \`path\`` の書式を壊し、対応側が別のパスを読む
+    // `./x` や `a//b` は、git の `<rev>:<path>` の解決と 場所の照合でずれるので受け付けない
     const oddSegments = path !== null && path.split("/").some((seg) => seg === "" || seg === ".");
     if (path !== null && (!isRepoRelativePath(path) || isUnsafePath(path) || /[\s`]/.test(path) || oddSegments)) {
       errors.push(`${at}.path はリポジトリのルートからの相対パスにしてください（絶対パス・..・./・\\・空白・'・\` は使えません）: ${JSON.stringify(path)}`);
@@ -154,9 +154,12 @@ export function suspiciousPhrases(f: FindingInput): string[] {
   return found;
 }
 
-/** 本文に載せる文の無害化。`@` と `[review-bot` を崩し、見えない文字を取り除く */
+/**
+ * 本文に載せる文の無害化。`@` と `[review-bot` を崩し、見えない文字を取り除く。
+ * 4 バイト文字は投稿の直前にも置き換わる（plan.md §4-7）ので、ここでそろえて重複の検査で投稿済みの本文と比べられるようにする
+ */
 export function safe(textValue: string): string {
-  return neutralize(textValue).replace(CONTROL, "");
+  return replaceFourByteChars(neutralize(textValue).replace(CONTROL, ""));
 }
 
 /** §2-1 の書式に整える */
@@ -164,7 +167,7 @@ export function formatFinding(f: FindingInput): string {
   const where = f.side === "old" ? `L${f.line}（変更前）` : `L${f.line}`;
   const lines = [
     `${FINDING_HEADLINE} ${SEVERITY_MARK[f.severity]}`,
-    `📍 \`${safe(f.path)}\` ${where}`,
+    `場所: \`${safe(f.path)}\` ${where}`,
     `${f.kind === "question" ? "質問" : "指摘"}: ${safe(f.title)}`,
   ];
   if (f.expected) lines.push(`${f.kind === "question" ? "確認したいこと" : "期待"}: ${safe(f.expected)}`);

@@ -4,10 +4,14 @@ import { isRepoRelativePath, isUnsafePath } from "./text.js";
 const AROUND = 15;
 const MAX_CONTEXTS = 3;
 const MAX_HUNK_LINES = 60;
-/** 本文の `📍 path L42`（レビュアー向けのテンプレートの書式, §4-2） */
+/**
+ * 本文の場所の印（レビュアー向けのテンプレートの書式, §4-2）。行の先頭の `場所: path L42` と、
+ * 以前の書式の `📍 path L42`（絵文字の記法 `:round_pushpin:`・`:pushpin:` を含む, §4-7）を読む
+ */
+const BODY_MARKER = /(?:^[ \t]*場所[ \t]*[:：]|📍|:round_pushpin:|:pushpin:)\s*`?([^\s`]+)`?\s*[LＬ](\d+)/gm;
 export function parseBodyMarkers(content) {
     const found = [];
-    for (const m of content.matchAll(/📍\s*`?([^\s`]+)`?\s*[LＬ](\d+)/g)) {
+    for (const m of content.matchAll(BODY_MARKER)) {
         const path = m[1];
         if (isUnsafePath(path) || !isRepoRelativePath(path))
             continue;
@@ -76,7 +80,7 @@ async function hunkAt(repoDir, refs, path, line, side) {
 }
 /**
  * 解釈が必要な指摘の周りのコードを集める（§3-2 手順 2, 改善案 A-1）。
- * 行コメントの位置と、本文（最新の追加の指示、なければ元のコメント）の `📍` から、3 か所まで
+ * 行コメントの位置と、本文（最新の追加の指示、なければ元のコメント）の `場所:`（以前の書式の `📍` を含む）から、3 か所まで
  */
 export async function itemContexts(repoDir, refs, raw, root, latestFollowUp) {
     const contexts = [];

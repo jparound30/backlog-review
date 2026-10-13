@@ -7,6 +7,7 @@ import { allowedWorkFile, parseChoice } from "../commands.ts";
 import { blobIdAt, readBlob } from "../git/git.ts";
 import { firstLine } from "../reply/format.ts";
 import { saveJsonAtomic } from "../state/store.ts";
+import { replaceFourByteChars } from "../text.ts";
 import { label, neutralize, parseItemKey } from "../thread/marker.ts";
 import { type VerifiedItem, verifyItems } from "./verify.ts";
 
@@ -24,6 +25,7 @@ async function readJsonFile(file: string, stateRoot: string, what: string): Prom
 }
 import {
   type FindingInput,
+  FINDING_HEADLINE,
   findingId,
   formatFinding,
   formatNoFindings,
@@ -54,11 +56,11 @@ export function itemLocation(item: ReviewItem): string {
     return `${loc.filePath} ${side}L${loc.line}${now}`;
   }
   const m = item.root.bodyMarkers[0];
-  if (m) return `${m.path} L${m.line}（📍）${item.root.bodyMarkers.length > 1 ? `（ほか ${item.root.bodyMarkers.length - 1} 箇所）` : ""}`;
+  if (m) return `${m.path} L${m.line}（本文の場所）${item.root.bodyMarkers.length > 1 ? `（ほか ${item.root.bodyMarkers.length - 1} 箇所）` : ""}`;
   return "場所の指定なし";
 }
 
-/** 既存の指摘の場所（行コメントの現在の行、または本文の 📍）。重複の検査に使う */
+/** 既存の指摘の場所（行コメントの現在の行、または本文の `場所:`）。重複の検査に使う */
 function itemPlaces(item: ReviewItem): Array<{ path: string; line: number | null }> {
   const places: Array<{ path: string; line: number | null }> = [];
   const loc = item.root.location;
@@ -147,7 +149,7 @@ async function checkFinding(
   if (!changed) {
     warnings.push("PR の変更ファイルにないファイルへの指摘です（対応側は直さず、確認の質問を返します）");
   } else if (f.side === "new" && !changed.newRanges.some((r) => f.line >= r.start && f.line <= r.end)) {
-    warnings.push("PR で変更されていない行への指摘です（場所は 📍 で伝わりますが、差分の外です）");
+    warnings.push("PR で変更されていない行への指摘です（場所は本文の `場所:` で伝わりますが、差分の外です）");
   }
   for (const item of snapshot.items) {
     if (item.status === "resolved" || item.status === "not_actionable") continue;
@@ -416,7 +418,7 @@ export type ResolveAction = (typeof RESOLVE_ACTIONS)[number];
 
 type ResolveEntry = { key: string; action: ResolveAction; bodyFile: string };
 
-const REVIEW_HEADLINE = "🤖 自動レビュー";
+const REVIEW_HEADLINE = FINDING_HEADLINE;
 
 function parseResolveBatch(data: unknown): ResolveEntry[] {
   if (!Array.isArray(data)) throw new Error("結果の JSON は配列にしてください");
@@ -441,7 +443,8 @@ function parseResolveBatch(data: unknown): ResolveEntry[] {
 /** 本文を §2-2 の書式に整える。先頭の番号と印は CLI が付け、エージェントの書き間違いで新しい指摘になるのを防ぐ */
 export function formatResolution(key: string, action: ResolveAction, body: string): string {
   const head = action === "resolve" ? `${label(key)} ✅ ${REVIEW_HEADLINE}: ` : `${label(key)} ${REVIEW_HEADLINE}: `;
-  return head + neutralize(body.trim());
+  // 4 バイト文字は投稿の直前にも置き換わる（plan.md §4-7）。下書きで見せる本文を、投稿する本文とそろえる
+  return replaceFourByteChars(head + neutralize(body.trim()));
 }
 
 /** 再レビュー手順 4・5: 解決・再指摘・回答を投稿する。--yes がなければ本文を表示するだけ */
