@@ -4,7 +4,7 @@ description: Backlog のプルリクエストに付いたレビューコメン�
 license: MIT
 compatibility: Node.js 20 以上と git が必要。Backlog API へのネットワーク接続と、環境変数 BACKLOG_API_KEY・BACKLOG_SPACE が必要。シェルのコマンドを実行できるエージェントを想定。
 metadata:
-  version: "20261013.1.0"
+  version: "20261017.1.0"
   language: ja
 ---
 
