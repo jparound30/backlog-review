@@ -7,6 +7,7 @@ import { blobIdAt, readBlob } from "../git/git.js";
 import { firstLine } from "../reply/format.js";
 import { saveJsonAtomic } from "../state/store.js";
 import { replaceFourByteChars } from "../text.js";
+import { categoryLabel } from "../thread/category.js";
 import { label, neutralize, parseItemKey } from "../thread/marker.js";
 import { verifyItems } from "./verify.js";
 const digest = (text) => createHash("sha256").update(text).digest("hex");
@@ -156,6 +157,7 @@ function printDraft(n, d, state, ctx) {
     const head = f ? `${SEVERITY_MARK[f.severity]}  ${f.kind === "question" ? "質問" : "指摘"}` : SEVERITY_MARK.none;
     ctx.out(`${String(n).padStart(3)}. ${pad(head, 22)} ${f ? `${f.path} ${f.side === "old" ? "旧" : ""}L${f.line}` : ""}${posted ? `  （投稿済み: #${posted.commentId}）` : ""}`);
     if (f) {
+        ctx.out(`       分類: ${categoryLabel(f.category)}`);
         ctx.out(`       ${f.kind === "question" ? "質問" : "指摘"}: ${f.title}`);
         if (f.expected)
             ctx.out(`       ${f.kind === "question" ? "確認したいこと" : "期待"}: ${f.expected}`);

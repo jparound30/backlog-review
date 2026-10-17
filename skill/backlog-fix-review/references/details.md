@@ -66,7 +66,7 @@ node ~/.claude/skills/backlog-fix-review/scripts/cli.js --help
 2. **`curl`・`wget`・`node -e`・`python -c` など、任意の通信やコードの実行ができるコマンドを許可リストに入れない。**
 3. **投稿を伴うコマンド（`reply … --yes`、`summary … --yes`）と `git push` は、許可リストに入れない。** 毎回の確認が、投稿と push の前の最後の確認になります。
 
-読み取りだけのコマンド（`fetch` / `status` / `interpret` / `select` / `check-push`）は、許可の確認を省略してもかまいません。返信は `reply --batch … --yes` でまとめて投稿するので、許可の確認は 1 回で済みます（中身は直前の確認②で見ています）。
+読み取りだけのコマンド（`fetch` / `status` / `interpret` / `select` / `check-push` / `export`）は、許可の確認を省略してもかまいません。返信は `reply --batch … --yes` でまとめて投稿するので、許可の確認は 1 回で済みます（中身は直前の確認②で見ています）。
 
 エージェントは CLI を、次の形（`node` の後に**絶対パスを単一引用符で囲んで**書く）で実行します。許可設定はこの形に合わせてください。
 
@@ -84,7 +84,8 @@ Claude Code の場合の例（`~/.claude/settings.json` か、対象リポジト
       "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' status:*)",
       "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' interpret:*)",
       "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' select:*)",
-      "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' check-push:*)"
+      "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' check-push:*)",
+      "Bash(node '/home/<あなた>/.claude/skills/backlog-fix-review/scripts/cli.js' export:*)"
     ]
   }
 }
@@ -116,6 +117,9 @@ Claude Code の場合の例（`~/.claude/settings.json` か、対象リポジト
 |---|---|
 | `<対象リポジトリのルート>/.review-state/{PROJECT}-{repo}-pr{N}.json` | 状態ファイル。解釈の結果、指摘ごとのコミット、操作の記録 |
 | `<対象リポジトリのルート>/.review-state/{PROJECT}-{repo}-pr{N}.snapshot.json` | 最後に同期した時点のコメントと状態（エージェントが読む） |
+| `<対象リポジトリのルート>/.review-state/export/{PROJECT}-{repo}-pr{N}-{日時}.csv` と `.md` | `export` で出力した対応の記録。CSV は UTF-8（BOM 付き）で、Excel でそのまま開ける。Markdown は冒頭に集計（状態別・分類別など）。指摘者の名前とコメントの本文が入る。同じ名前のファイルがあれば上書きしない |
+
+記録の列（CSV）: PR・RC・指摘日時・指摘者・出どころ（人間 / 自動レビュー）・重大度・分類・要約・本文（元のコメントの全文。CSV だけ）・場所・状態・対応区分（修正 / 回答 / 確認中 / 見送り）・対応内容・コミット・最終返信日時・解決日時・解決者・自動返信の回数・追加コメントの回数・リンク。PR の列があるので、PR ごとの CSV をつなげて集計できます。サマリーコメントと「指摘なし」のコメントは行にしません。`=` などで始まるセルは、表計算ソフトで数式として働かないよう先頭に `'` を付け、秘密情報らしき文字列のセルは省きます。
 
 - worktree で実行した場合は、その worktree のルートに作られます。
 - `.review-state/` は git に無視させていません（対応の記録として後で使えるようにするため）。スキルはこのフォルダをコミットしませんが、**手で `git add -A` などをするとコミットされる**ので注意してください。コメントの本文とレビュアーの名前が含まれます。API キーは含まれません。
@@ -168,6 +172,7 @@ node <スキルのフォルダ>/scripts/cli.js status <PR の URL> --repo <対�
 | `reply <URL> --key <RC-…> --status <状態> --body-file <md> [--commit <sha>]... [--yes]` | 1 件だけ返信する（`--yes` がなければ下書きの表示だけ） |
 | `summary <URL> [--yes]` | サマリーを作成・更新する（`--yes` がなければ下書きの表示だけ） |
 | `check-push <URL>` | push する差分の追加行とコミットメッセージを API キー・秘密情報で検査する（見つかれば終了コード 1）。PR の元の変更ファイルの範囲外のファイルも示す |
+| `export <URL> [--all]` | 指摘ごとの対応の記録を CSV と Markdown にして `.review-state/export/` に出力する（読み取りだけ。出力先は変えられない）。`--all` で返信しない指摘も出す。状態ファイルがあれば、まだ返信していない指摘の分類と、返信しない指摘の判定を補う |
 
 共通オプション: `--repo <dir>`（対象リポジトリ。既定はカレントディレクトリ）
 

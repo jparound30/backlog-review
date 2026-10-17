@@ -8,6 +8,7 @@ import { blobIdAt, readBlob } from "../git/git.ts";
 import { firstLine } from "../reply/format.ts";
 import { saveJsonAtomic } from "../state/store.ts";
 import { replaceFourByteChars } from "../text.ts";
+import { categoryLabel } from "../thread/category.ts";
 import { label, neutralize, parseItemKey } from "../thread/marker.ts";
 import { type VerifiedItem, verifyItems } from "./verify.ts";
 
@@ -175,6 +176,7 @@ function printDraft(n: number, d: Draft, state: ReviewState, ctx: ReviewCommandC
   const head = f ? `${SEVERITY_MARK[f.severity]}  ${f.kind === "question" ? "質問" : "指摘"}` : SEVERITY_MARK.none;
   ctx.out(`${String(n).padStart(3)}. ${pad(head, 22)} ${f ? `${f.path} ${f.side === "old" ? "旧" : ""}L${f.line}` : ""}${posted ? `  （投稿済み: #${posted.commentId}）` : ""}`);
   if (f) {
+    ctx.out(`       分類: ${categoryLabel(f.category)}`);
     ctx.out(`       ${f.kind === "question" ? "質問" : "指摘"}: ${f.title}`);
     if (f.expected) ctx.out(`       ${f.kind === "question" ? "確認したいこと" : "期待"}: ${f.expected}`);
     if (f.background) ctx.out(`       背景: ${f.background}`);

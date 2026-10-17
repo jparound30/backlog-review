@@ -8,6 +8,7 @@ import { type LocalState, loadState, saveJsonAtomic, snapshotPath, statePath } f
 import { isUnsafePath } from "./text.ts";
 import { type ItemContext, itemContexts } from "./context.ts";
 import { parseReplyFields, type ReplyLocation } from "./reply/format.ts";
+import { type Category, parseCategoryLine } from "./thread/category.ts";
 import { type ItemKey, label, type ReplyStatus } from "./thread/marker.ts";
 import { buildThreads, type CommentRole, type ItemStatus, type ThreadWarning } from "./thread/thread.ts";
 
@@ -61,10 +62,17 @@ export type SnapshotItem = {
   commits: string[];
   /** 最後の自動返信の「場所」の行（§5-1 の 6）。解釈がないときのサマリーの場所に使う */
   lastReplyLocation: ReplyLocation | null;
+  /**
+   * root の `分類:` の行（§4-8）。自動レビューの指摘や、人間が書いたもの。レビュアーの分類として、解釈の分類より優先する。
+   * 投稿者を限定せずに読む（分類は表示と記録だけに使い、自動で動く根拠にしないため）
+   */
+  rootCategory: Category | null;
+  /** 最後の自動返信の `**分類**:` の行（§4-8）。状態ファイルがなくても分類を読み戻すため */
+  lastReplyCategory: Category | null;
 };
 
 /** 同じコミットは、短い ID の一致でまとめる */
-function mergeCommits(known: string[], replied: string[]): string[] {
+export function mergeCommits(known: string[], replied: string[]): string[] {
   const merged = [...known];
   for (const sha of replied) {
     if (!merged.some((m) => m.startsWith(sha) || sha.startsWith(m))) merged.push(sha);
@@ -137,6 +145,33 @@ function isInterpretationValid(
 }
 
 /**
+ * 状態ファイルの解釈のうち、今のコメントに対して使えるもの。
+ * 編集された root の解釈は捨てる。
+ * 状態ファイルは書き換えられる可能性があるので、解釈はエージェントの入力と同じ検査をし直し（S-7）、
+ * 保存されたランクと返信の状態は使わず、判定から求め直す（§3-3）。
+ * 以前の形（分割した key・points のない解釈）は通らないので、解釈し直しになる
+ */
+export function validInterpretations(state: LocalState, byId: Map<number, BacklogComment>): Map<string, StoredInterpretation> {
+  const interpretations = new Map<string, StoredInterpretation>();
+  for (const [key, stored] of Object.entries(state.interpretations)) {
+    const interp = stored as Partial<StoredInterpretation> | null;
+    if (!interp || interp.key !== key) continue;
+    const { items, errors } = validateInterpretations([{ key: interp.key, category: interp.category, points: interp.points }]);
+    if (errors.length > 0 || typeof interp.rootUpdated !== "string" || byId.get(Number(key))?.updated !== interp.rootUpdated) continue;
+    if (typeof interp.lastHumanCommentId !== "number" || typeof interp.interpretedAt !== "string") continue;
+    interpretations.set(key, {
+      key,
+      ...(items[0].category ? { category: items[0].category } : {}),
+      ...assessInterpretation(items[0].points),
+      rootUpdated: interp.rootUpdated,
+      lastHumanCommentId: interp.lastHumanCommentId,
+      interpretedAt: interp.interpretedAt,
+    });
+  }
+  return interpretations;
+}
+
+/**
  * 起動時の同期（§5-1）。コメントを全件取り直してスレッドと状態を作り直し、
  * ローカルの状態とスナップショットを保存する。
  */
@@ -161,25 +196,7 @@ export async function sync(
     );
   }
 
-  // 編集された root の解釈は捨てる。
-  // 状態ファイルは書き換えられる可能性があるので、解釈はエージェントの入力と同じ検査をし直し（S-7）、
-  // 保存されたランクと返信の状態は使わず、判定から求め直す（§3-3）。
-  // 以前の形（分割した key・points のない解釈）は通らないので、解釈し直しになる
-  const interpretations = new Map<string, StoredInterpretation>();
-  for (const [key, stored] of Object.entries(state.interpretations)) {
-    const interp = stored as Partial<StoredInterpretation> | null;
-    if (!interp || interp.key !== key) continue;
-    const { items, errors } = validateInterpretations([{ key: interp.key, points: interp.points }]);
-    if (errors.length > 0 || typeof interp.rootUpdated !== "string" || byId.get(Number(key))?.updated !== interp.rootUpdated) continue;
-    if (typeof interp.lastHumanCommentId !== "number" || typeof interp.interpretedAt !== "string") continue;
-    interpretations.set(key, {
-      key,
-      ...assessInterpretation(items[0].points),
-      rootUpdated: interp.rootUpdated,
-      lastHumanCommentId: interp.lastHumanCommentId,
-      interpretedAt: interp.interpretedAt,
-    });
-  }
+  const interpretations = validInterpretations(state, byId);
   const built = buildThreads(comments, { myselfId: myself.id, interpretations });
 
   const refs = await refsOf(ctx.repoDir, pullRequest);
@@ -232,6 +249,8 @@ export async function sync(
         botReplies.flatMap((r) => parseReplyFields(r.content).commits),
       ),
       lastReplyLocation: botReplies.length > 0 ? parseReplyFields(botReplies.at(-1)!.content).location : null,
+      rootCategory: parseCategoryLine(rootSnapshot.content),
+      lastReplyCategory: botReplies.length > 0 ? parseReplyFields(botReplies.at(-1)!.content).category : null,
     });
   }
 

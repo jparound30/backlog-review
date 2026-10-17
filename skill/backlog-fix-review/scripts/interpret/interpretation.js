@@ -1,4 +1,5 @@
 import { isRepoRelativePath, isUnsafePath } from "../text.js";
+import { CATEGORY_CODES, isCategory } from "../thread/category.js";
 import { parseItemKey } from "../thread/marker.js";
 /** §3-2 手順 2 の種類（論点ごと） */
 export const KINDS = ["fix", "answer", "needs_info", "wontfix", "not_actionable"];
@@ -183,11 +184,14 @@ export function validateInterpretations(data) {
             errors.push(`${at} points（論点の配列）が必要です。論点が 1 つでも配列にしてください`);
             return;
         }
+        if (r.category !== undefined && !isCategory(r.category)) {
+            errors.push(`${at} category は ${CATEGORY_CODES.join(" / ")} のどれかにしてください: ${String(r.category)}`);
+        }
         const multiple = r.points.length > 1;
         const points = r.points.map((p, i) => validatePoint(p, `${at}.points[${i}]`, multiple, errors));
         if (errors.length > before)
             return;
-        items.push({ key, points: points });
+        items.push({ key, ...(isCategory(r.category) ? { category: r.category } : {}), points: points });
     });
     return { items, errors };
 }

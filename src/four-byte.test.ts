@@ -42,7 +42,7 @@ describe("4 バイト文字の置き換え（§4-7）", () => {
     assert.doesNotMatch(summary, FOUR_BYTE);
     assert.match(summary, /^## :computer: レビュー対応状況/);
     for (const severity of ["critical", "warning", "suggestion"]) {
-      const f = validateFindings([{ path: "src/a.ts", line: 1, severity, title: "t", expected: "e" }]).findings[0];
+      const f = validateFindings([{ path: "src/a.ts", line: 1, severity, category: "logic", title: "t", expected: "e" }]).findings[0];
       assert.doesNotMatch(formatFinding(f), FOUR_BYTE, severity);
     }
     assert.doesNotMatch(formatNoFindings({ fileCount: 1, baseCommit: "a".repeat(40), branchCommit: "b".repeat(40), base: "main", branch: "f" }), FOUR_BYTE);
@@ -50,7 +50,7 @@ describe("4 バイト文字の置き換え（§4-7）", () => {
 
   test("エージェントが書いた文の絵文字も、指摘の本文では置き換わる（重複の検査で投稿済みの本文と比べられる）", () => {
     assert.equal(safe("落ちる🔥"), "落ちるU+1F525");
-    const f = validateFindings([{ path: "src/a.ts", line: 1, severity: "warning", title: "落ちる🔥", expected: "直す" }]).findings[0];
+    const f = validateFindings([{ path: "src/a.ts", line: 1, severity: "warning", category: "logic", title: "落ちる🔥", expected: "直す" }]).findings[0];
     assert.match(formatFinding(f), /^指摘: 落ちるU\+1F525$/m);
   });
 });

@@ -91,7 +91,7 @@ describe("論点の組み合わせによる返信の制限と、分割しない�
 
   test("直し方の決まらない論点があれば needs_info だけを許し、コミットも付けさせない", async () => {
     comments = [comment(10, OTHER, "1. 名前を data に\n2. もう少し良くして")];
-    await interpret([{ key: "RC-10", points: [point("fix", "clear", "名前"), point("fix", "ambiguous", "改善")] }]);
+    await interpret([{ key: "RC-10", category: "logic", points: [point("fix", "clear", "名前"), point("fix", "ambiguous", "改善")] }]);
     assert.match(out.join("\n"), /論点 2 件 .*返信: needs_info {2}ランク: low/);
     assert.match(out.join("\n"), /直し方が決まっている論点は、回答の後にまとめて直す/);
 
@@ -107,7 +107,7 @@ describe("論点の組み合わせによる返信の制限と、分割しない�
 
   test("分割した key は受け付けない", async () => {
     comments = [comment(30, OTHER, "指摘")];
-    await assert.rejects(interpret([{ key: "RC-30#1", points: [point("fix")] }]), /分割しません/);
+    await assert.rejects(interpret([{ key: "RC-30#1", category: "logic", points: [point("fix")] }]), /分割しません/);
   });
 
   test("状態ファイルが消えても、以前に分割して返信した指摘は一覧から消えない（R-2）", async () => {
@@ -177,7 +177,7 @@ describe("論点の組み合わせによる返信の制限と、分割しない�
 
   test("期限切れの前回の解釈は、同じ環境に残っていれば参考として添える", async () => {
     comments = [comment(60, OTHER, "1. 名前を data に\n2. もう少し良くして")];
-    await interpret([{ key: "RC-60", points: [point("fix", "clear", "名前"), point("fix", "ambiguous", "改善")] }]);
+    await interpret([{ key: "RC-60", category: "logic", points: [point("fix", "clear", "名前"), point("fix", "ambiguous", "改善")] }]);
     comments.push(
       comment(61, ME, `🤖 自動対応\n\n${formatReplyMarker({ root: "60", replyTo: 60, status: "needs_info" })}`),
       comment(62, OTHER, "RC-60 2 はログを足す意味です"),
@@ -255,13 +255,13 @@ describe("判定と修正の裏付けの検査（R-4・R-5）", () => {
 
   test("行番号がファイルの行数を超えていれば、解釈を受け付けない（R-5）", async () => {
     comments = [comment(80, OTHER, "feature.ts L9 を直して")];
-    await assert.rejects(interpret([{ key: "RC-80", points: [at("feature.ts", 9)] }]), /行数（2）を超えています/);
+    await assert.rejects(interpret([{ key: "RC-80", category: "logic", points: [at("feature.ts", 9)] }]), /行数（2）を超えています/);
   });
 
   test("確認①に元のコメントの全文と、変更ファイルにない場所・行コメントとの食い違いを出す（R-5）", async () => {
     const blob = (await git("rev-parse", "origin/feature:feature.ts")).stdout.trim();
     comments = [{ ...comment(81, OTHER, "1 行目の名前を直して\n2 行目もお願いします"), filePath: "feature.ts", position: 1, oldBlobId: null, newBlobId: blob }];
-    const text = await interpret([{ key: "RC-81", points: [at("base.ts", 1)] }]);
+    const text = await interpret([{ key: "RC-81", category: "logic", points: [at("base.ts", 1)] }]);
     assert.match(text, /元のコメント:\n {9}\| 1 行目の名前を直して\n {9}\| 2 行目もお願いします/);
     assert.match(text, /⚠️ 行コメントの場所（feature\.ts）を指す論点がありません/);
     assert.match(text, /⚠️ base\.ts は PR の変更ファイルにありません/);
@@ -270,8 +270,8 @@ describe("判定と修正の裏付けの検査（R-4・R-5）", () => {
   test("fixed のコミットには、その指摘の Refs: が必要（R-4）", async () => {
     comments = [comment(90, OTHER, "feature.ts L1 の名前を直して"), comment(91, OTHER, "feature.ts L2 も")];
     await interpret([
-      { key: "RC-90", points: [at("feature.ts", 1)] },
-      { key: "RC-91", points: [at("feature.ts", 2)] },
+      { key: "RC-90", category: "logic", points: [at("feature.ts", 1)] },
+      { key: "RC-91", category: "logic", points: [at("feature.ts", 2)] },
     ]);
     const original = (await git("rev-parse", "HEAD")).stdout.trim();
     const for90 = await pushed("feature.ts", "renamed\nline2\n", "fix: 名前を直す\n\nRefs: RC-90");
@@ -369,9 +369,9 @@ describe("まとめて実行する入口（select・reply --batch, §8 M11）", 
     await writeFile(
       file,
       JSON.stringify([
-        { key: "RC-10", points: [at()] },
-        { key: "RC-11", points: [at(undefined, "ambiguous")] },
-        { key: "RC-12", points: [at(undefined, "clear", docs)] },
+        { key: "RC-10", category: "logic", points: [at()] },
+        { key: "RC-11", category: "logic", points: [at(undefined, "ambiguous")] },
+        { key: "RC-12", category: "logic", points: [at(undefined, "clear", docs)] },
       ]),
     );
     await run(() => interpretCommand(PR, file, ctx()));
@@ -506,6 +506,7 @@ describe("指摘ごとの周りのコード（contexts, 改善案 A-1）", () =>
       JSON.stringify([
         {
           key: "RC-133",
+          category: "logic",
           points: [
             {
               kind: "fix",
@@ -584,7 +585,7 @@ describe("コミットの補助コマンド（commit, 改善案 A-5）", () => {
     await git("update-ref", "refs/remotes/origin/feature", "HEAD");
     comments = [comment(10, OTHER, "feature.ts L1 の名前を直して"), comment(11, OTHER, "もう少し良く")];
     const file = join(work, "interp.json");
-    await writeFile(file, JSON.stringify([{ key: "RC-10", points: [point("clear")] }, { key: "RC-11", points: [point("ambiguous")] }]));
+    await writeFile(file, JSON.stringify([{ key: "RC-10", category: "logic", points: [point("clear")] }, { key: "RC-11", category: "logic", points: [point("ambiguous")] }]));
     await interpretCommand(PR, file, ctx());
   });
   after(async () => {
@@ -647,5 +648,98 @@ describe("interpret --file の読み込み先の制限（plan.md §6-1, 2026-10-
     await writeFile(bad, "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCDEF");
     await assert.rejects(interpretCommand(PR, bad, ctx), (e: Error) => /JSON として読めません/.test(e.message) && !/ghp_/.test(e.message));
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("指摘の分類（§4-8, M15）", () => {
+  let repo: string;
+  let work: string;
+  let comments: BacklogComment[];
+  const out: string[] = [];
+  const ctx = (): CommandContext => ({
+    client: {
+      getMyself: async () => ({ id: ME, userId: null, name: "me" }),
+      getPullRequest: async () => ({ summary: "s", base: "main", branch: "feature", status: { id: 1, name: "Open" } }),
+      listAllComments: async () => comments,
+    } as unknown as BacklogClient,
+    repoDir: repo,
+    stateRoot: repo,
+    out: (line) => out.push(line),
+  });
+  const interpret = async (data: unknown) => {
+    const file = join(work, "interp.json");
+    await writeFile(file, JSON.stringify(data));
+    out.length = 0;
+    await interpretCommand(PR, file, ctx());
+    return out.join("\n");
+  };
+  const reply = async (key: string, status: string) => {
+    const body = join(work, "body.md");
+    await writeFile(body, "回答です");
+    out.length = 0;
+    await replyCommand(PR, { key, status, bodyFile: body, commits: [], post: false }, ctx());
+    return out.join("\n");
+  };
+
+  before(async () => {
+    repo = await mkdtemp(join(tmpdir(), "bfr-category-"));
+    work = await mkdtemp(join(tmpdir(), "bfr-category-work-"));
+    const git = (...args: string[]) => runGit(repo, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args]);
+    await runGit(repo, ["init", "-q", "-b", "main"]);
+    await writeFile(join(repo, "base.ts"), "base\n");
+    await git("add", ".");
+    await git("commit", "-q", "-m", "base");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    await git("checkout", "-q", "-b", "feature");
+    await writeFile(join(repo, "feature.ts"), "feature\n");
+    await git("add", ".");
+    await git("commit", "-q", "-m", "feature");
+    await git("update-ref", "refs/remotes/origin/feature", "HEAD");
+  });
+  after(async () => {
+    await rm(repo, { recursive: true, force: true });
+    await rm(work, { recursive: true, force: true });
+  });
+
+  test("分類がなければ解釈を受け付けない。not_actionable だけの指摘には要らない", async () => {
+    comments = [comment(10, OTHER, "なぜこうしたのですか"), comment(11, OTHER, "LGTM")];
+    await assert.rejects(interpret([{ key: "RC-10", points: [point("answer")] }]), /RC-10 category（指摘の分類）がありません/);
+    await assert.rejects(interpret([{ key: "RC-10", category: "bug", points: [point("answer")] }]), /category は logic \/ error_handling/);
+    const text = await interpret([
+      { key: "RC-10", category: "design", points: [point("answer")] },
+      { key: "RC-11", points: [point("not_actionable")] },
+    ]);
+    assert.match(text, /分類: 設計・保守性\n/);
+  });
+
+  test("返信の場所の次の行に分類を書き、読み戻せる。判定は分類で変わらない", async () => {
+    comments = [comment(20, OTHER, "なぜこうしたのですか")];
+    const a = await interpret([{ key: "RC-20", category: "security", points: [point("answer")] }]);
+    const b = await interpret([{ key: "RC-20", category: "docs", points: [point("answer")] }]);
+    assert.equal(a.replace(/分類: .*/g, ""), b.replace(/分類: .*/g, ""));
+    const text = await reply("RC-20", "answered");
+    assert.match(text, /\*\*場所\*\*: `feature\.ts` L1\n\*\*分類\*\*: ドキュメント\n\*\*回答\*\*: 回答です/);
+  });
+
+  test("指摘に `分類:` があれば、解釈の分類より優先して使い、解釈では省ける", async () => {
+    comments = [comment(30, OTHER, "場所: feature.ts L1\n分類：エラー処理\n指摘: 例外を握りつぶしている")];
+    const text = await interpret([{ key: "RC-30", category: "logic", points: [point("answer")] }]);
+    assert.match(text, /分類: エラー処理（指摘に書かれたもの）/);
+    assert.match(text, /指摘に書かれた「エラー処理」を使います/);
+    await interpret([{ key: "RC-30", points: [point("answer")] }]);
+    assert.match(await reply("RC-30", "answered"), /\*\*分類\*\*: エラー処理/);
+  });
+
+  test("自動返信の分類は、状態ファイルがなくてもスナップショットに読み戻せる。以前の版の返信は分類なし", async () => {
+    const withCategory = formatReply({ key: "40", replyTo: 40, reviewerName: "a", quoteSource: "q", status: "answered", location: null, body: "b", commits: [], category: "performance" });
+    const old = formatReply({ key: "41", replyTo: 41, reviewerName: "a", quoteSource: "q", status: "answered", location: null, body: "**分類**: セキュリティ", commits: [] });
+    comments = [comment(40, OTHER, "質問"), comment(41, OTHER, "質問"), comment(42, ME, withCategory), comment(43, ME, old)];
+    await rm(join(repo, ".review-state"), { recursive: true, force: true });
+    out.length = 0;
+    const snapshot = await fetchCommand(PR, ctx(), true);
+    const byKey = (key: string) => snapshot.items.find((i) => i.key === key)!;
+    assert.equal(byKey("40").lastReplyCategory, "performance");
+    assert.equal(byKey("41").lastReplyCategory, null);
+    assert.equal(byKey("40").rootCategory, null);
   });
 });

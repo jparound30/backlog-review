@@ -58,7 +58,7 @@ node ~/.claude/skills/backlog-review/scripts/review-cli.js --help
 2. **`curl`・`wget`・`node -e`・`python -c` など、任意の通信やコードの実行ができるコマンドを許可リストに入れない。** エージェントの環境には API キーがあるので、差分に誘導されたエージェントが API を直接呼べば、CLI の検査（秘密情報・二重投稿）は通らなくなります。
 3. **投稿を伴うコマンド（`post … --yes`、`resolve … --yes`）は許可リストに入れない。** 毎回の確認が、投稿の前の最後の確認になります。
 
-読み取りだけのコマンド（`fetch` / `status` / `draft` / `select` / `verify`）は、許可の確認を省略してもかまいません。
+読み取りだけのコマンド（`fetch` / `status` / `draft` / `select` / `verify` / `export`）は、許可の確認を省略してもかまいません。
 
 Claude Code の場合の例（パスは実際の置き場所に読み替える）:
 
@@ -70,7 +70,8 @@ Claude Code の場合の例（パスは実際の置き場所に読み替える�
       "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' status:*)",
       "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' draft:*)",
       "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' select:*)",
-      "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' verify:*)"
+      "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' verify:*)",
+      "Bash(node '/home/<あなた>/.claude/skills/backlog-review/scripts/review-cli.js' export:*)"
     ]
   }
 }
@@ -98,6 +99,9 @@ Claude Code の場合の例（パスは実際の置き場所に読み替える�
 |---|---|
 | `<対象リポジトリのルート>/.review-state/{PROJECT}-{repo}-pr{N}.review.json` | 状態ファイル。下書き、選択、投稿した指摘のコメント ID、操作の記録 |
 | `<対象リポジトリのルート>/.review-state/{PROJECT}-{repo}-pr{N}.review.snapshot.json` | 最後に同期した時点の差分・コメント・状態（エージェントが読む） |
+| `<対象リポジトリのルート>/.review-state/export/{PROJECT}-{repo}-pr{N}-{日時}.csv` と `.md` | `export` で出力した対応の記録。CSV は UTF-8（BOM 付き）で、Excel でそのまま開ける。Markdown は冒頭に集計（状態別・分類別など）。指摘者の名前とコメントの本文が入る。同じ名前のファイルがあれば上書きしない |
+
+記録の列（CSV）: PR・RC・指摘日時・指摘者・出どころ（人間 / 自動レビュー）・重大度・分類・要約・本文（元のコメントの全文。CSV だけ）・場所・状態・対応区分（修正 / 回答 / 確認中 / 見送り）・対応内容・コミット・最終返信日時・解決日時・解決者・自動返信の回数・追加コメントの回数・リンク。PR の列があるので、PR ごとの CSV をつなげて集計できます。サマリーコメントと「指摘なし」のコメントは行にしません。`=` などで始まるセルは、表計算ソフトで数式として働かないよう先頭に `'` を付け、秘密情報らしき文字列のセルは省きます。
 
 - 対応側の状態ファイル（`…pr{N}.json`）とは別のファイルなので、同じ clone で両方のスキルを動かしても壊れません。
 - `.review-state/` は git に無視させていません。スキルはコミットしませんが、**手で `git add -A` などをするとコミットされる**ので注意してください。コメントの本文と差分が含まれます。API キーは含まれません。
@@ -132,6 +136,7 @@ node '<SKILL_DIR>/scripts/review-cli.js' <コマンド> <PR URL> --repo "$(pwd)"
 | `select <URL> --choice <1,3-5\|all\|none>` | 確認①の回答を下書きの番号に置き換える |
 | `post <URL> [--yes]` | 選ばれた下書きを投稿する。`--yes` がなければ本文の全文を表示するだけ。本文は状態ファイルの値ではなく指摘の項目から作り直して照合し、`--yes` は最後に表示した本文と同じときだけ投稿する。投稿済みのものは投稿しない |
 | `verify <URL>` | 対応側の返信があってレビュアーの番の指摘を、返信の本文・コミット（push 済みか・変更ファイル・差分）・指摘の行の現在の内容とともに表示する。警告: コミットがない・手元にない・未 push・指摘のファイルを変えていない、PR 作成者以外の返信、自分の指摘でない |
+| `export <URL> [--all]` | 指摘ごとの対応の記録を CSV と Markdown にして `.review-state/export/` に出力する（読み取りだけ。出力先は変えられない）。`--all` で返信しない指摘も出す。対応側の `export` と同じ表になる（まだ自動返信のない指摘の分類などを補わない点だけが違う） |
 | `resolve <URL> --batch <json> [--yes]` | 解決（`resolve`）・再指摘（`reopen`）・回答（`answer`）を投稿する。JSON は `[{"key","action","bodyFile"}]`。先頭の `RC-番号`（と解決なら `✅`）は CLI が付ける。拒否: レビュアーの番でない指摘、`needs_info` への `resolve`、`fixed` の返信にコミットがない・手元にない・push されていないときの `resolve`、`RC-` で始まる本文、マーカーに見える最後の行、秘密情報、同じ指摘の重複。`--yes` は最後に表示した本文と同じときだけ投稿する |
 
 `--yes` を付けない限り、Backlog には何も投稿しません。

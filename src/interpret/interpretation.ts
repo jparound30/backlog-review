@@ -1,4 +1,5 @@
 import { isRepoRelativePath, isUnsafePath } from "../text.ts";
+import { type Category, CATEGORY_CODES, isCategory } from "../thread/category.ts";
 import { type ItemKey, parseItemKey, type ReplyStatus } from "../thread/marker.ts";
 
 /** §3-2 手順 2 の種類（論点ごと） */
@@ -34,6 +35,11 @@ export type PointInput = {
  */
 export type InterpretationInput = {
   key: ItemKey;
+  /**
+   * 指摘の分類（§4-8）。論点が複数あっても指摘の単位で 1 つ。判定には使わない。
+   * root に `分類:` の行があればそちらを使うので省ける。not_actionable だけの指摘でも省ける
+   */
+  category?: Category;
   points: PointInput[];
 };
 
@@ -59,7 +65,7 @@ export type Assessment = {
 };
 
 /** ローカルに保存する解釈。CLI が決めた扱いと、解釈の有効期限の判定材料を持つ */
-export type StoredInterpretation = { key: ItemKey } & Assessment & {
+export type StoredInterpretation = { key: ItemKey; category?: Category } & Assessment & {
   rootUpdated: string;
   lastHumanCommentId: number;
   interpretedAt: string;
@@ -242,10 +248,13 @@ export function validateInterpretations(data: unknown): { items: InterpretationI
       errors.push(`${at} points（論点の配列）が必要です。論点が 1 つでも配列にしてください`);
       return;
     }
+    if (r.category !== undefined && !isCategory(r.category)) {
+      errors.push(`${at} category は ${CATEGORY_CODES.join(" / ")} のどれかにしてください: ${String(r.category)}`);
+    }
     const multiple = r.points.length > 1;
     const points = r.points.map((p, i) => validatePoint(p, `${at}.points[${i}]`, multiple, errors));
     if (errors.length > before) return;
-    items.push({ key, points: points as PointInput[] });
+    items.push({ key, ...(isCategory(r.category) ? { category: r.category } : {}), points: points as PointInput[] });
   });
   return { items, errors };
 }

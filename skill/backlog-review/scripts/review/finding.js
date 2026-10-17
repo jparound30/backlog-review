@@ -4,6 +4,7 @@
  */
 import { createHash } from "node:crypto";
 import { isRepoRelativePath, isUnsafePath, replaceFourByteChars } from "../text.js";
+import { CATEGORY_CODES, formatCategoryLine, isCategory } from "../thread/category.js";
 import { lastLine, neutralize } from "../thread/marker.js";
 /** 重大度。`none` は「指摘なし」のコメント（§2-3） */
 export const FINDING_SEVERITIES = ["critical", "warning", "suggestion", "none"];
@@ -88,6 +89,8 @@ export function validateFindings(data) {
             errors.push(`${at}.side は new か old にしてください`);
         if (!isFindingSeverity(f.severity) || f.severity === "none")
             errors.push(`${at}.severity は critical / warning / suggestion のどれかにしてください`);
+        if (!isCategory(f.category))
+            errors.push(`${at}.category は ${CATEGORY_CODES.join(" / ")} のどれかにしてください`);
         const kind = f.kind ?? "fix";
         if (kind !== "fix" && kind !== "question")
             errors.push(`${at}.kind は fix か question にしてください`);
@@ -102,6 +105,7 @@ export function validateFindings(data) {
             line: f.line,
             side: side,
             severity: f.severity,
+            category: f.category,
             kind: kind,
             title: title,
             expected,
@@ -146,6 +150,7 @@ export function formatFinding(f) {
     const lines = [
         `${FINDING_HEADLINE} ${SEVERITY_MARK[f.severity]}`,
         `場所: \`${safe(f.path)}\` ${where}`,
+        formatCategoryLine(f.category),
         `${f.kind === "question" ? "質問" : "指摘"}: ${safe(f.title)}`,
     ];
     if (f.expected)

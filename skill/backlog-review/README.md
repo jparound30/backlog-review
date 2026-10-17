@@ -43,6 +43,8 @@ https://yourspace.backlog.jp/git/PROJECT/repo/pullRequests/42 をレビューし
 
 PR の作成者が `backlog-fix-review` で対応して返信したら、同じ URL でもう一度実行してください。修正を確かめて、解決か再指摘を返します。
 
+**対応の記録**: 「この PR のレビューの記録を出して」と頼むと、指摘ごとの対応状況（指摘者・分類・対応内容・コミット・解決日時など）を CSV（Excel で開ける）と Markdown（集計つき）にして、`.review-state/export/` に出力します。Backlog には何も投稿しません（[詳細](references/details.md#作成されるファイル)）。
+
 ## レビューの観点
 
 レビューの観点（チェックリスト・規約）は、このスキルの中には持ちません。**対象リポジトリで管理しているドキュメント**（`AGENTS.md`・Steering・レビューガイドなど）を読みます。探し方は [references/guidelines.md](references/guidelines.md) にあります。

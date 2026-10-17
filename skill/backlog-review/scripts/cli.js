@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import { BacklogClient } from "./backlog/client.js";
 import { parsePullRequestUrl } from "./backlog/url.js";
 import { checkPushCommand, commitCommand, fetchCommand, interpretCommand, replyBatchCommand, replyCommand, selectCommand, summaryCommand, } from "./commands.js";
+import { exportCommand } from "./export/command.js";
 import { repositoryRoot } from "./git/git.js";
 import { sanitizeForTerminal } from "./text.js";
 const USAGE = `使い方: node <スキルのディレクトリ>/scripts/cli.js <コマンド> <PR URL> [オプション]
@@ -25,6 +26,9 @@ const USAGE = `使い方: node <スキルのディレクトリ>/scripts/cli.js <
                        サマリーコメントを作成・更新する。--yes がなければ内容を表示するだけ
   check-push <PR URL>  push する前に、出ていくコミットごとの追加行とメッセージを API キー・秘密情報で検査する。
                        見つかれば終了コード 1。PR の元の変更ファイルの範囲外のファイルも示す
+  export <PR URL> [--all]
+                       指摘ごとの対応の記録を CSV と Markdown にして .review-state/export/ に出力する（読み取りだけ）。
+                       --all で返信しない指摘（not_actionable）も出す
 
 共通オプション:
   --repo <dir>         対象リポジトリ（既定: カレントディレクトリ）。事前に git fetch しておくこと
@@ -54,6 +58,7 @@ async function main(argv) {
             choice: { type: "string" },
             "message-file": { type: "string" },
             yes: { type: "boolean" },
+            all: { type: "boolean" },
             help: { type: "boolean", short: "h" },
         },
     });
@@ -110,6 +115,9 @@ async function main(argv) {
             return summaryCommand(pr, values.yes === true, ctx);
         case "check-push":
             return checkPushCommand(pr, ctx);
+        case "export":
+            await exportCommand(pr, ctx, { all: values.all === true, skill: "backlog-fix-review", useFixState: true, apiKey: process.env.BACKLOG_API_KEY });
+            return;
         default:
             console.error(USAGE);
             process.exitCode = 1;
