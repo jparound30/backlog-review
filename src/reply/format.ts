@@ -188,8 +188,11 @@ export function formatProgress(statuses: ItemStatus[]): string {
   return `進み具合: ☑️ 完了 ${done} / ${counted.length} 件（レビュアーの確認待ち ${waitingReviewer} 件・自動対応待ち ${waitingBot} 件）`;
 }
 
-/** サマリーコメント（§4-5）。not_actionable は出さない */
-export function formatSummary(rows: SummaryRow[], now = new Date()): string {
+/**
+ * サマリー（§4-5）。not_actionable は出さない。要約の列は省略しない（§4-5-1。エスケープはほかのセルと同じ）。
+ * PR の説明文の区画に置くとき（§4-5-1）は `marker: false` にする。説明文ではマーカーを読まないため
+ */
+export function formatSummary(rows: SummaryRow[], now = new Date(), options: { marker?: boolean } = {}): string {
   const visible = rows.filter((r) => r.status !== "not_actionable");
   const lines = [`## :computer: レビュー対応状況（最終更新: ${formatJst(now)}）`, ""];
   if (visible.length === 0) {
@@ -206,11 +209,12 @@ export function formatSummary(rows: SummaryRow[], now = new Date()): string {
       const rc = commentLink(label(r.key), r.rootId);
       const latest = r.latestReplyId ? commentLink(`#${r.latestReplyId}`, r.latestReplyId) : "-";
       lines.push(
-        `| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`,
+        `| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`,
       );
     }
   }
   // マーカーは最後の行でないと働かないので、「次にすること」はその前に置く（§6-1）
-  lines.push("", ...NEXT_STEPS, "", SUMMARY_MARKER_TEXT);
+  lines.push("", ...NEXT_STEPS);
+  if (options.marker ?? true) lines.push("", SUMMARY_MARKER_TEXT);
   return replaceFourByteChars(lines.join("\n"));
 }

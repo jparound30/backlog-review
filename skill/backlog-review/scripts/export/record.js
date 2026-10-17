@@ -101,11 +101,26 @@ export async function buildRecords(input) {
             response: last ? parseReplyBody(last.comment.content ?? "") : null,
             commits,
             lastReplyAt: last?.comment.created ?? null,
+            lastReplyId: last?.comment.id ?? null,
             resolvedAt: resolveComment?.created ?? null,
             resolvedBy: resolveComment?.createdUser?.name ?? null,
             botReplies: replies.length,
             followUps: item.events.filter((e) => e.type === "follow_up").length,
             everFixed: replies.some((r) => r.status === "fixed"),
+            history: [
+                { commentId: root.id, at: root.created, author: root.createdUser?.name ?? "", kind: "review", body: content },
+                ...item.events.map((e) => {
+                    const c = byId.get(e.commentId);
+                    return {
+                        commentId: c.id,
+                        at: c.created,
+                        author: c.createdUser?.name ?? "",
+                        kind: e.type,
+                        ...(e.type === "bot_reply" ? { status: e.status } : {}),
+                        body: c.content ?? "",
+                    };
+                }),
+            ].sort((a, b) => a.commentId - b.commentId),
             url: `${input.prUrl}#comment-${root.id}`,
         });
     }

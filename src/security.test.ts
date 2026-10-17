@@ -134,7 +134,9 @@ describe("2 回目のレビューで追加した対策（§6-1）", () => {
     ]);
     assert.doesNotMatch(summary, /\]\(https/);
     assert.doesNotMatch(summary, /evil/);
-    assert.match(summary, /…/);
+    // 要約の列は省略しない（plan.md §4-5-1）。エスケープは同じなので、リンクは働かない
+    assert.ok(summary.includes("長".repeat(100)));
+    assert.doesNotMatch(summary, /…/);
   });
 });
 

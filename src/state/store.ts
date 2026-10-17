@@ -22,6 +22,8 @@ export type LocalState = {
   log: Array<{ at: string; action: string; key?: ItemKey; commentId?: number; detail?: string }>;
   /** 確認①の一覧の番号の並び（interpret が出したもの）。select が回答を読むのに使う（§8 M11） */
   listed?: { at: string; keys: ItemKey[] };
+  /** 確認②（--yes なしの summary）で表示した内容のダイジェスト。--yes はこれと同じときだけ反映する（§4-5-1） */
+  shownSummary?: { at: string; digest: string };
 };
 
 export const STATE_ROOT = ".review-state";

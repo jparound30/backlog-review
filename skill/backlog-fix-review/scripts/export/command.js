@@ -19,7 +19,11 @@ function stamp(date, offsetMinutes) {
 export function exportDir(stateRoot) {
     return join(stateRoot, STATE_ROOT, "export");
 }
-export async function exportCommand(pr, ctx, options) {
+/**
+ * Backlog から取り直したコメントで記録を組み立てる（§5-2）。読むだけで、何も書かない。
+ * サマリー（§4-5-1）も、どちらのスキルで作っても同じ内容になるよう、これを使う
+ */
+export async function collectRecords(pr, ctx, options) {
     const [myself, pullRequest, comments] = await Promise.all([
         ctx.client.getMyself(),
         ctx.client.getPullRequest(pr),
@@ -61,6 +65,10 @@ export async function exportCommand(pr, ctx, options) {
         stateCommits,
         all: options.all,
     });
+    return { result, myself, pullRequest, comments, prUrl, notes };
+}
+export async function exportCommand(pr, ctx, options) {
+    const { result, pullRequest, prUrl, notes } = await collectRecords(pr, ctx, options);
     const now = options.now ?? new Date();
     const csv = formatCsv(result.records, { apiKey: options.apiKey, offsetMinutes: options.offsetMinutes });
     const md = formatMarkdown(result, {

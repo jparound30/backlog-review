@@ -8,6 +8,7 @@ import { blobIdAt, readBlob } from "../git/git.ts";
 import { firstLine } from "../reply/format.ts";
 import { saveJsonAtomic } from "../state/store.ts";
 import { replaceFourByteChars } from "../text.ts";
+import { summaryCommand as runSummary } from "../summary/command.ts";
 import { categoryLabel } from "../thread/category.ts";
 import { label, neutralize, parseItemKey } from "../thread/marker.ts";
 import { type VerifiedItem, verifyItems } from "./verify.ts";
@@ -530,4 +531,28 @@ export async function resolveCommand(pr: PullRequestRef, file: string, post: boo
     process.exitCode = 1;
     ctx.out(`\n✖ ${failed} 件の投稿に失敗しました。「応答がありませんでした」なら status で確かめてから、失敗したものだけを再実行する`);
   }
+}
+
+/**
+ * サマリーを PR の説明文の区画に反映する（plan.md §4-5-1・R11）。内容と手順は対応側と同じ。
+ * 説明文を更新できなければ、サマリーコメントは投稿しない（§2-3）
+ */
+export async function reviewSummaryCommand(pr: PullRequestRef, post: boolean, ctx: ReviewCommandContext): Promise<void> {
+  const path = reviewStatePath(ctx.stateRoot, pr);
+  await runSummary(pr, ctx, {
+    post,
+    side: "review",
+    saveShown: async (digest) => {
+      const state = await loadReviewState(path, pr);
+      state.shownSummary = { at: new Date().toISOString(), digest };
+      await saveJsonAtomic(path, state);
+    },
+    loadShown: async () => (await loadReviewState(path, pr)).shownSummary?.digest,
+    log: async (action, commentId) => {
+      const state = await loadReviewState(path, pr);
+      state.shownSummary = undefined;
+      state.log.push({ at: new Date().toISOString(), action, ...(commentId !== undefined ? { commentId } : {}) });
+      await saveJsonAtomic(path, state);
+    },
+  });
 }

@@ -27,6 +27,7 @@ import {
   type SyncContext,
 } from "./sync.ts";
 import { type Category, CATEGORY_CODES, categoryLabel } from "./thread/category.ts";
+import { summaryCommand as runSummary } from "./summary/command.ts";
 import { isReplyStatus, label, parseItemKey, type ReplyStatus } from "./thread/marker.ts";
 import { parseFindingMarker } from "./review/finding.ts";
 
@@ -721,33 +722,26 @@ export async function selectCommand(pr: PullRequestRef, choice: string, ctx: Com
 }
 
 /** §4-5: サマリーコメントを作成、または更新する */
+/** サマリーを更新する（§4-5・§4-5-1）。PR の説明文の区画を基本にし、更新できなければサマリーコメント */
 export async function summaryCommand(pr: PullRequestRef, post: boolean, ctx: CommandContext): Promise<void> {
-  const { snapshot } = await sync(pr, ctx);
-  const text = formatSummary(
-    snapshot.items.map((item) => ({
-      key: item.key,
-      reviewerName: item.root.author.name,
-      summary: firstLine(summaryLine(item.root.content), 30),
-      status: item.status,
-      location: replyLocation(item),
-      commits: item.commits,
-      rootId: item.root.id,
-      latestReplyId: item.botReplyIds.at(-1) ?? null,
-    })),
-  );
-  if (!post) {
-    ctx.out(`--- ${snapshot.summaryCommentId ? `#${snapshot.summaryCommentId} を更新` : "新規に投稿"}する内容（--yes を付けると反映します）---`);
-    ctx.out(text);
-    return;
-  }
-  const result = snapshot.summaryCommentId
-    ? await ctx.client.updateComment(pr, snapshot.summaryCommentId, text)
-    : await ctx.client.postComment(pr, text);
-  const state = await loadState(statePath(ctx.stateRoot, pr), pr);
-  state.summaryCommentId = result.id;
-  state.log.push({ at: new Date().toISOString(), action: snapshot.summaryCommentId ? "summary:update" : "summary:create", commentId: result.id });
-  await saveJsonAtomic(statePath(ctx.stateRoot, pr), state);
-  ctx.out(`サマリーを${snapshot.summaryCommentId ? "更新" : "投稿"}しました: #${result.id}`);
+  const path = statePath(ctx.stateRoot, pr);
+  await runSummary(pr, ctx, {
+    post,
+    side: "fix",
+    saveShown: async (digest) => {
+      const state = await loadState(path, pr);
+      state.shownSummary = { at: new Date().toISOString(), digest };
+      await saveJsonAtomic(path, state);
+    },
+    loadShown: async () => (await loadState(path, pr)).shownSummary?.digest,
+    log: async (action, commentId) => {
+      const state = await loadState(path, pr);
+      if (commentId !== undefined && (action === "summary:create" || action === "summary:update")) state.summaryCommentId = commentId;
+      state.shownSummary = undefined;
+      state.log.push({ at: new Date().toISOString(), action, ...(commentId !== undefined ? { commentId } : {}) });
+      await saveJsonAtomic(path, state);
+    },
+  });
 }
 
 /**

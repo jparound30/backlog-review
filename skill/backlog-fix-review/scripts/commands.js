@@ -9,6 +9,7 @@ import { firstLine, formatReply, formatSummary } from "./reply/format.js";
 import { loadState, saveJsonAtomic, snapshotPath, STATE_ROOT as STATE_DIR, statePath } from "./state/store.js";
 import { assertSafeBranchName, isUnsafePath, resolveRef, sync, } from "./sync.js";
 import { CATEGORY_CODES, categoryLabel } from "./thread/category.js";
+import { summaryCommand as runSummary } from "./summary/command.js";
 import { isReplyStatus, label, parseItemKey } from "./thread/marker.js";
 import { parseFindingMarker } from "./review/finding.js";
 /**
@@ -666,31 +667,27 @@ export async function selectCommand(pr, choice, ctx) {
     await saveJsonAtomic(statePath(ctx.stateRoot, pr), latest);
 }
 /** §4-5: サマリーコメントを作成、または更新する */
+/** サマリーを更新する（§4-5・§4-5-1）。PR の説明文の区画を基本にし、更新できなければサマリーコメント */
 export async function summaryCommand(pr, post, ctx) {
-    const { snapshot } = await sync(pr, ctx);
-    const text = formatSummary(snapshot.items.map((item) => ({
-        key: item.key,
-        reviewerName: item.root.author.name,
-        summary: firstLine(summaryLine(item.root.content), 30),
-        status: item.status,
-        location: replyLocation(item),
-        commits: item.commits,
-        rootId: item.root.id,
-        latestReplyId: item.botReplyIds.at(-1) ?? null,
-    })));
-    if (!post) {
-        ctx.out(`--- ${snapshot.summaryCommentId ? `#${snapshot.summaryCommentId} を更新` : "新規に投稿"}する内容（--yes を付けると反映します）---`);
-        ctx.out(text);
-        return;
-    }
-    const result = snapshot.summaryCommentId
-        ? await ctx.client.updateComment(pr, snapshot.summaryCommentId, text)
-        : await ctx.client.postComment(pr, text);
-    const state = await loadState(statePath(ctx.stateRoot, pr), pr);
-    state.summaryCommentId = result.id;
-    state.log.push({ at: new Date().toISOString(), action: snapshot.summaryCommentId ? "summary:update" : "summary:create", commentId: result.id });
-    await saveJsonAtomic(statePath(ctx.stateRoot, pr), state);
-    ctx.out(`サマリーを${snapshot.summaryCommentId ? "更新" : "投稿"}しました: #${result.id}`);
+    const path = statePath(ctx.stateRoot, pr);
+    await runSummary(pr, ctx, {
+        post,
+        side: "fix",
+        saveShown: async (digest) => {
+            const state = await loadState(path, pr);
+            state.shownSummary = { at: new Date().toISOString(), digest };
+            await saveJsonAtomic(path, state);
+        },
+        loadShown: async () => (await loadState(path, pr)).shownSummary?.digest,
+        log: async (action, commentId) => {
+            const state = await loadState(path, pr);
+            if (commentId !== undefined && (action === "summary:create" || action === "summary:update"))
+                state.summaryCommentId = commentId;
+            state.shownSummary = undefined;
+            state.log.push({ at: new Date().toISOString(), action, ...(commentId !== undefined ? { commentId } : {}) });
+            await saveJsonAtomic(path, state);
+        },
+    });
 }
 /**
  * 空のツリーの ID。SHA-1 と SHA-256 のどちらのリポジトリでも求められるよう、git に計算させる

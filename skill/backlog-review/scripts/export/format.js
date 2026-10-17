@@ -4,6 +4,7 @@
  */
 import { containsApiKey, findSecretPattern } from "../backlog/secrets.js";
 import { cell } from "../reply/format.js";
+import { escapeQuoted } from "../thread/marker.js";
 import { CATEGORIES, categoryLabel } from "../thread/category.js";
 import { sanitizeForTerminal } from "../text.js";
 const RESPONSE_LABEL = {
@@ -31,17 +32,57 @@ export function formatRecordLocation(r) {
         return "";
     return `${r.location.path}${r.location.line === null ? "" : ` L${r.location.line}`}${r.location.estimated ? "（推定）" : ""}`;
 }
-/** 表示を偽装できる文字を除き、1 行にする。秘密情報らしき文字列があればセルごと省く */
+/**
+ * 表示を偽装できる文字を除く。記録なので改行は残し、LF にそろえる（行の区切りの CRLF と見分けるため, §5-2）。
+ * 秘密情報らしき文字列があればセルごと省く
+ */
 function clean(text, apiKey) {
-    const oneLine = sanitizeForTerminal(text)
-        .replace(/\r\n|\r|\n/g, " / ")
-        .replace(/\t/g, " ")
-        .trim();
-    if (findSecretPattern(oneLine) || (apiKey && containsApiKey(oneLine, apiKey)))
+    const value = sanitizeForTerminal(text.replace(/\r\n?/g, "\n")).trim();
+    if (findSecretPattern(value) || (apiKey && containsApiKey(value, apiKey)))
         return SECRET_OMITTED;
-    return oneLine;
+    return value;
 }
-/** CSV のセル。`=`・`+`・`-`・`@` などで始まる値は、表計算ソフトで数式として働かないよう先頭に `'` を付ける */
+const HISTORY_KIND = {
+    review: "指摘",
+    follow_up: "追加の指示・回答",
+    resolve: "解決",
+    bot_reply: "自動返信",
+};
+/**
+ * 「やり取り」の列（§5-2）。1 件ごとに `【番号】日時 投稿者（種類）: 本文`。
+ * 秘密情報らしき文字列は、そのコメントの本文だけを省く（列全体は省かない）
+ */
+/** ファイル内のリンクの ID（§5-2）。コメント ID（数字）だけから作る */
+const listAnchor = (r) => `rc-${r.rootId}`;
+const historyAnchor = (r) => `history-rc-${r.rootId}`;
+function historyKind(h) {
+    return h.kind === "bot_reply" && h.status ? `${HISTORY_KIND[h.kind]}・${h.status}` : HISTORY_KIND[h.kind];
+}
+/**
+ * Markdown の「やり取り」の節（§5-2）。指摘ごとに見出しを立て、コメントを時系列の番号付きの一覧にする。
+ * 本文は改行を残した引用にし、行ごとにエスケープする（リンクや画像として働かないように）
+ */
+export function formatHistoryMarkdown(records, options = {}) {
+    const lines = ["", "## やり取り"];
+    for (const r of records) {
+        lines.push("", `### <a id="${historyAnchor(r)}"></a>${r.key}: ${cell(clean(r.summary, options.apiKey), Infinity)}`, "", `[一覧に戻る](#${listAnchor(r)})`, "");
+        r.history.forEach((h, i) => {
+            lines.push(`${i + 1}. ${formatTime(h.at, options.offsetMinutes)} ${cell(clean(h.author, options.apiKey), Infinity)}（${historyKind(h)}）`);
+            const body = clean(h.body, options.apiKey);
+            for (const line of body.split("\n"))
+                lines.push(line.trim() === "" ? "   >" : `   > ${escapeQuoted(line)}`);
+        });
+    }
+    return lines;
+}
+export function formatHistory(history, options = {}) {
+    return history
+        .map((h, i) => {
+        return `【${i + 1}】${formatTime(h.at, options.offsetMinutes)} ${clean(h.author, options.apiKey)}（${historyKind(h)}）: ${clean(h.body, options.apiKey)}`;
+    })
+        .join("\n");
+}
+/** CSV のセル。改行は引用符の中に残る。`=`・`+`・`-`・`@` などで始まる値は、表計算ソフトで数式として働かないよう先頭に `'` を付ける */
 export function csvCell(text, apiKey) {
     let value = clean(text, apiKey);
     if (/^[=+\-@\t\r]/.test(value))
@@ -62,6 +103,7 @@ const COLUMNS = [
     ["状態", (r) => r.status],
     ["対応区分", (r) => (r.lastReplyStatus ? RESPONSE_LABEL[r.lastReplyStatus] : "")],
     ["対応内容", (r) => r.response ?? ""],
+    ["やり取り", (r, o, k) => formatHistory(r.history, { apiKey: k, offsetMinutes: o })],
     ["コミット", (r) => r.commits.join(", ")],
     ["最終返信日時", (r, o) => formatTime(r.lastReplyAt, o)],
     ["解決日時", (r, o) => formatTime(r.resolvedAt, o)],
@@ -74,7 +116,7 @@ const COLUMNS = [
 export function formatCsv(records, options = {}) {
     const lines = [COLUMNS.map(([name]) => csvCell(name)).join(",")];
     for (const r of records)
-        lines.push(COLUMNS.map(([, get]) => csvCell(get(r, options.offsetMinutes), options.apiKey)).join(","));
+        lines.push(COLUMNS.map(([, get]) => csvCell(get(r, options.offsetMinutes, options.apiKey), options.apiKey)).join(","));
     return `\ufeff${lines.join("\r\n")}\r\n`;
 }
 function days(from, to) {
@@ -148,7 +190,8 @@ export function formatMarkdown(result, meta) {
     lines.push("", "## 一覧", "", "| RC | 指摘日時 | 指摘者 | 分類 | 重大度 | 要約 | 場所 | 状態 | 対応区分 | コミット | 解決日時 |", "|---|---|---|---|---|---|---|---|---|---|---|");
     for (const r of records) {
         lines.push(`| ${[
-            r.key,
+            // 一覧の行の ID と、その指摘のやり取りへのリンク
+            `<a id="${listAnchor(r)}"></a>[${r.key}](#${historyAnchor(r)})`,
             formatTime(r.createdAt, meta.offsetMinutes),
             md(r.reviewer),
             r.category ? categoryLabel(r.category) : "",
@@ -161,5 +204,6 @@ export function formatMarkdown(result, meta) {
             formatTime(r.resolvedAt, meta.offsetMinutes),
         ].join(" | ")} |`);
     }
+    lines.push(...formatHistoryMarkdown(records, { apiKey: meta.apiKey, offsetMinutes: meta.offsetMinutes }));
     return `${lines.join("\n")}\n`;
 }

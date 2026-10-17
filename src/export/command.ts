@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { BacklogClient } from "../backlog/client.ts";
+import type { BacklogComment, BacklogPullRequest, BacklogUser } from "../backlog/types.ts";
 import type { PullRequestRef } from "../backlog/url.ts";
 import { locateComment } from "../git/diff.ts";
 import { isObjectId } from "../git/git.ts";
@@ -12,7 +13,7 @@ import type { StoredInterpretation } from "../interpret/interpretation.ts";
 import { assertNotSymlink, loadState, STATE_ROOT, statePath } from "../state/store.ts";
 import { pullRequestUrl, refsOf, validInterpretations } from "../sync.ts";
 import { formatCsv, formatMarkdown } from "./format.ts";
-import { buildRecords } from "./record.ts";
+import { buildRecords, type ExportResult } from "./record.ts";
 
 export type ExportContext = {
   client: BacklogClient;
@@ -45,7 +46,24 @@ export function exportDir(stateRoot: string): string {
   return join(stateRoot, STATE_ROOT, "export");
 }
 
-export async function exportCommand(pr: PullRequestRef, ctx: ExportContext, options: ExportOptions): Promise<{ csv: string; md: string }> {
+export type Collected = {
+  result: ExportResult;
+  myself: BacklogUser;
+  pullRequest: BacklogPullRequest;
+  comments: BacklogComment[];
+  prUrl: string;
+  notes: string[];
+};
+
+/**
+ * Backlog から取り直したコメントで記録を組み立てる（§5-2）。読むだけで、何も書かない。
+ * サマリー（§4-5-1）も、どちらのスキルで作っても同じ内容になるよう、これを使う
+ */
+export async function collectRecords(
+  pr: PullRequestRef,
+  ctx: Omit<ExportContext, "out">,
+  options: { all: boolean; useFixState: boolean },
+): Promise<Collected> {
   const [myself, pullRequest, comments] = await Promise.all([
     ctx.client.getMyself(),
     ctx.client.getPullRequest(pr),
@@ -86,7 +104,11 @@ export async function exportCommand(pr: PullRequestRef, ctx: ExportContext, opti
     stateCommits,
     all: options.all,
   });
+  return { result, myself, pullRequest, comments, prUrl, notes };
+}
 
+export async function exportCommand(pr: PullRequestRef, ctx: ExportContext, options: ExportOptions): Promise<{ csv: string; md: string }> {
+  const { result, pullRequest, prUrl, notes } = await collectRecords(pr, ctx, options);
   const now = options.now ?? new Date();
   const csv = formatCsv(result.records, { apiKey: options.apiKey, offsetMinutes: options.offsetMinutes });
   const md = formatMarkdown(result, {

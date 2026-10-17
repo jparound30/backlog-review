@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, test } from "node:test";
+import { after, afterEach, before, describe, test } from "node:test";
 import type { BacklogClient } from "../backlog/client.ts";
 import type { BacklogComment } from "../backlog/types.ts";
 import { type CommandContext, interpretCommand } from "../commands.ts";
@@ -44,12 +44,12 @@ describe("自動返信の本文の読み戻し（§5-2）", () => {
 });
 
 describe("CSV のセルと時刻（§5-2）", () => {
-  test("数式として働く先頭の文字に ' を付け、引用符を逃がし、改行を 1 行にする", () => {
+  test("数式として働く先頭の文字に ' を付け、引用符を逃がす。改行はセルの中に LF で残す", () => {
     assert.equal(csvCell("=HYPERLINK(\"x\")"), `"'=HYPERLINK(""x"")"`);
     assert.equal(csvCell("+1"), `"'+1"`);
     assert.equal(csvCell("-1"), `"'-1"`);
     assert.equal(csvCell("@SUM(A1)"), `"'@SUM(A1)"`);
-    assert.equal(csvCell("a\nb\r\nc"), `"a / b / c"`);
+    assert.equal(csvCell("a\nb\r\nc\rd"), `"a\nb\nc\nd"`);
     assert.equal(csvCell("x\u202ey\u0007"), `"xy"`);
   });
 
@@ -68,6 +68,7 @@ describe("export（§5-2, M16）", () => {
   let repo: string;
   let work: string;
   let comments: BacklogComment[];
+  let baseComments: BacklogComment[];
   const out: string[] = [];
   const client = (myself: number) =>
     ({
@@ -143,6 +144,11 @@ describe("export（§5-2, M16）", () => {
       { key: "RC-60", category: "security", points: [point("answer")] },
     ]));
     await interpretCommand(PR, file, fixCtx());
+    baseComments = comments;
+  });
+  // 途中で失敗したテストが comments を差し替えたままにしても、ほかのテストに波及しないようにする
+  afterEach(() => {
+    comments = baseComments;
   });
   after(async () => {
     await rm(repo, { recursive: true, force: true });
@@ -163,14 +169,20 @@ describe("export（§5-2, M16）", () => {
 
   test("解決した指摘: 分類・対応区分・対応内容・コミット・解決日時と解決者・往復の回数", async () => {
     const { csv, md } = await run("fix");
-    assert.equal(
-      row(csv, "RC-10"),
+    const cells = row(csv, "RC-10")!.slice(1, -1).split('","');
+    const header = csv.replace(/^\ufeff/, "").split("\r\n")[0].slice(1, -1).split('","');
+    const at = (name: string) => cells[header.indexOf(name)];
+    assert.deepEqual(
+      header.filter((h) => h !== "やり取り").map(at),
       [
         "P/r#1", "RC-10", "2026-10-12 09:00", "user2", "人間", "", "設計・保守性", "変数名を data にしてください", "変数名を data にしてください", "",
         "resolved", "修正", "data に改名しました", "0123456", "2026-10-12 10:00", "2026-10-14 09:00", "user2", "1", "0",
         "https://x.backlog.jp/git/P/r/pullRequests/1#comment-10",
-      ].map((v) => `"${v}"`).join(","),
+      ],
     );
+    // やり取り: 時系列に、日時・投稿者・種類を付けて並べる
+    const history = at("やり取り");
+    assert.match(history, /^【1】2026-10-12 09:00 user2（指摘）: 変数名を data にしてください\n【2】2026-10-12 10:00 user1（自動返信・fixed）: :computer: 自動対応 ↩️ RC-10 への返信[^\n]*\n[\s\S]*\n\*\*対応内容\*\*: data に改名しました\n[\s\S]*\n【3】2026-10-14 09:00 user2（解決）: RC-10 ✅$/);
     assert.match(md, /- 指摘: 4 件/);
     assert.match(md, /- 完了（resolved）: 1 件（25%）/);
     assert.match(md, /- 修正した指摘.*: 1 件/);
@@ -181,7 +193,7 @@ describe("export（§5-2, M16）", () => {
   test("自動レビューの指摘は、出どころ・重大度・本文の分類・`指摘:` の要約・場所を出す", async () => {
     const { csv } = await run("fix");
     const r20 = row(csv, "RC-20")!;
-    assert.match(r20, /"自動レビュー","warning","エラー処理","例外を握りつぶしている","[^"]*指摘: 例外を握りつぶしている \/ 期待: 再スローする[^"]*","feature\.ts L1","open","回答","意図的です"/);
+    assert.match(r20, /"自動レビュー","warning","エラー処理","例外を握りつぶしている","[^"]*\n指摘: 例外を握りつぶしている\n期待: 再スローする\n[^"]*","feature\.ts L1","open","回答","意図的です"/);
     assert.match(r20, /"1","1",/);
   });
 
@@ -223,13 +235,42 @@ describe("export（§5-2, M16）", () => {
     comments = saved;
   });
 
-  test("CSV の本文には、元のコメントの 2 行目以降も含めて全文を入れる。Markdown の一覧には入れない", async () => {
+  test("CSV の本文には、元のコメントの 2 行目以降も含めて、改行を残した全文を入れる。Markdown の一覧の表には入れない", async () => {
     const saved = comments;
-    comments = [comment(95, REVIEWER, "1 行目の要約\n\n2 行目の詳しい説明\n3 行目の補足")];
+    comments = [comment(95, REVIEWER, "1 行目の要約\r\n\r\n2 行目の詳しい説明\n3 行目の補足")];
     const { csv, md } = await run("fix");
-    assert.match(row(csv, "RC-95")!, /"1 行目の要約","1 行目の要約 \/  \/ 2 行目の詳しい説明 \/ 3 行目の補足"/);
+    assert.match(row(csv, "RC-95")!, /"1 行目の要約","1 行目の要約\n\n2 行目の詳しい説明\n3 行目の補足"/);
+    // 行の区切りは CRLF、セルの中は LF なので、行の数は指摘の数と同じ
+    assert.equal(csv.split("\r\n").length, 3);
     assert.match(csv, /^\ufeff"PR","RC","指摘日時","指摘者","出どころ","重大度","分類","要約","本文","場所"/);
-    assert.doesNotMatch(md, /2 行目の詳しい説明/);
+    assert.doesNotMatch(md.slice(md.indexOf("## 一覧"), md.indexOf("## やり取り")), /2 行目の詳しい説明/);
+    comments = saved;
+  });
+
+  test("やり取り: 追加の指示も時系列に入る。秘密情報は、そのコメントの本文だけを省く", async () => {
+    const { csv } = await run("fix");
+    const r20 = row(csv, "RC-20")!;
+    assert.match(r20, /【1】2026-10-12 09:00 user2（指摘）: :computer: 自動レビュー [\s\S]*\n【2】2026-10-12 09:00 user1（自動返信・answered）: [\s\S]*\n【3】2026-10-12 09:00 user2（追加の指示・回答）: RC-20 理由を教えてください"/);
+    const r70 = row(csv, "RC-70")!;
+    assert.match(r70, /【1】2026-10-12 09:00 user2（指摘）: =HYPERLINK\(""https:\/\/example\.invalid""\) を見て\n【2】2026-10-12 09:00 user1（自動返信・answered）: （秘密情報らしき文字列のため省略）"/);
+  });
+
+  test("Markdown のやり取り: 指摘ごとに、時系列の番号付きの一覧と、改行を残した引用。リンクや画像は働かない", async () => {
+    const saved = comments;
+    comments = [
+      comment(96, REVIEWER, "1 行目\n\n![画像](https://example.invalid/x.png) と [リンク](https://example.invalid)", "2026-10-12T00:00:00Z"),
+      comment(97, AUTHOR, formatReply({ key: "96", replyTo: 96, reviewerName: "user2", quoteSource: "q", status: "answered", location: null, body: "回答です", commits: [] }), "2026-10-12T01:00:00Z"),
+      comment(98, REVIEWER, "RC-96 ✅", "2026-10-13T00:00:00Z"),
+    ];
+    const { md } = await run("fix");
+    const section = md.slice(md.indexOf("## やり取り"));
+    assert.match(section, /^## やり取り\n\n### <a id="history-rc-96"><\/a>RC-96: 1 行目\n\n\[一覧に戻る\]\(#rc-96\)\n\n1\. 2026-10-12 09:00 user2（指摘）\n   > 1 行目\n   >\n   > \\!\\\[画像\\\]\\\(`https:\/\/example\.invalid\/x\.png`\\\)/);
+    assert.match(section, /\n2\. 2026-10-12 10:00 user1（自動返信・answered）\n   > :computer: 自動対応/);
+    assert.match(section, /\n3\. 2026-10-13 09:00 user2（解決）\n   > RC-96 ✅\n$/);
+    assert.doesNotMatch(section, /\]\(https:/);
+    // 一覧の行からやり取りへ、やり取りから一覧の行へ。リンク先の ID がファイルの中にある
+    assert.match(md, /\n\| <a id="rc-96"><\/a>\[RC-96\]\(#history-rc-96\) \| 2026-10-12 09:00 \|/);
+    for (const [, target] of md.matchAll(/\]\(#([a-z0-9-]+)\)/g)) assert.ok(md.includes(`<a id="${target}"></a>`), target);
     comments = saved;
   });
 

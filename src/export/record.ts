@@ -16,6 +16,17 @@ import { buildThreads, type ItemStatus } from "../thread/thread.ts";
 
 export type RecordSource = "human" | "auto_review";
 
+/** 指摘のやり取りの 1 件（§5-2 の「やり取り」）。コメントの順（時系列） */
+export type HistoryItem = {
+  commentId: number;
+  at: string;
+  author: string;
+  kind: "review" | "follow_up" | "resolve" | "bot_reply";
+  /** 自動返信の状態 */
+  status?: ReplyStatus;
+  body: string;
+};
+
 export type ExportRecord = {
   pr: string;
   key: string;
@@ -38,10 +49,14 @@ export type ExportRecord = {
   response: string | null;
   commits: string[];
   lastReplyAt: string | null;
+  /** 最後の自動返信のコメント ID（サマリーの「最新の返信」列, §4-5） */
+  lastReplyId: number | null;
   resolvedAt: string | null;
   resolvedBy: string | null;
   botReplies: number;
   followUps: number;
+  /** 元の指摘・追加の指示や回答・解決・自動返信を、コメントの順に並べたもの */
+  history: HistoryItem[];
   /** 自動返信が fixed だったことがある（修正した指摘） */
   everFixed: boolean;
   url: string;
@@ -174,11 +189,26 @@ export async function buildRecords(input: ExportInput): Promise<ExportResult> {
       response: last ? parseReplyBody(last.comment.content ?? "") : null,
       commits,
       lastReplyAt: last?.comment.created ?? null,
+      lastReplyId: last?.comment.id ?? null,
       resolvedAt: resolveComment?.created ?? null,
       resolvedBy: resolveComment?.createdUser?.name ?? null,
       botReplies: replies.length,
       followUps: item.events.filter((e) => e.type === "follow_up").length,
       everFixed: replies.some((r) => r.status === "fixed"),
+      history: [
+        { commentId: root.id, at: root.created, author: root.createdUser?.name ?? "", kind: "review" as const, body: content },
+        ...item.events.map((e) => {
+          const c = byId.get(e.commentId)!;
+          return {
+            commentId: c.id,
+            at: c.created,
+            author: c.createdUser?.name ?? "",
+            kind: e.type,
+            ...(e.type === "bot_reply" ? { status: e.status } : {}),
+            body: c.content ?? "",
+          };
+        }),
+      ].sort((a, b) => a.commentId - b.commentId),
       url: `${input.prUrl}#comment-${root.id}`,
     });
   }

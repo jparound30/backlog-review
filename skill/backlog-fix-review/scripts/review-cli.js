@@ -6,7 +6,7 @@ import { BacklogClient } from "./backlog/client.js";
 import { parsePullRequestUrl } from "./backlog/url.js";
 import { exportCommand } from "./export/command.js";
 import { repositoryRoot } from "./git/git.js";
-import { draftCommand, postCommand, resolveCommand, reviewFetchCommand, reviewSelectCommand, verifyCommand, } from "./review/commands.js";
+import { draftCommand, postCommand, resolveCommand, reviewFetchCommand, reviewSelectCommand, reviewSummaryCommand, verifyCommand, } from "./review/commands.js";
 import { sanitizeForTerminal } from "./text.js";
 const USAGE = `使い方: node <スキルのディレクトリ>/scripts/review-cli.js <コマンド> <PR URL> [オプション]
 
@@ -22,6 +22,9 @@ const USAGE = `使い方: node <スキルのディレクトリ>/scripts/review-c
   verify <PR URL>      対応側の返信があってレビュアーの番になっている指摘を、コミットと差分とともに表示する
   resolve <PR URL> --batch <結果.json> [--yes]
                        再レビューの結果（解決・再指摘・回答）を投稿する。--yes がなければ本文を表示するだけ
+  summary <PR URL> [--yes]
+                       PR の説明文のサマリーの区画を更新する。--yes がなければ変わる区画を表示するだけ。
+                       説明文を更新できなければ、サマリーコメントは投稿しない（対応側が更新する）
   export <PR URL> [--all]
                        指摘ごとの対応の記録を CSV と Markdown にして .review-state/export/ に出力する（読み取りだけ）。
                        --all で返信しない指摘（not_actionable）も出す
@@ -92,6 +95,8 @@ async function main(argv) {
             return postCommand(pr, values.yes === true, ctx);
         case "verify":
             return verifyCommand(pr, ctx);
+        case "summary":
+            return reviewSummaryCommand(pr, values.yes === true, ctx);
         case "export":
             await exportCommand(pr, ctx, { all: values.all === true, skill: "backlog-review", useFixState: false, apiKey: process.env.BACKLOG_API_KEY });
             return;

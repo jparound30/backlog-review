@@ -34,7 +34,8 @@ const USAGE = `使い方: node <スキルのディレクトリ>/scripts/cli.js <
   reply <PR URL> --batch <返信.json> [--yes]
                        複数の返信をまとめて扱う。JSON は [{"key","status","bodyFile","commits"}] の配列
   summary <PR URL> [--yes]
-                       サマリーコメントを作成・更新する。--yes がなければ内容を表示するだけ
+                       PR の説明文のサマリーの区画を更新する。説明文を更新できなければサマリーコメントを作成・更新する。
+                       --yes がなければ内容を表示するだけ
   check-push <PR URL>  push する前に、出ていくコミットごとの追加行とメッセージを API キー・秘密情報で検査する。
                        見つかれば終了コード 1。PR の元の変更ファイルの範囲外のファイルも示す
   export <PR URL> [--all]
