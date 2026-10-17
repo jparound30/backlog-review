@@ -172,10 +172,12 @@ describe("自動返信から場所とコミットを読み戻す（§5-1 の 6, 
     assert.deepEqual(parseReplyFields(formatReply(input)), {
       location: { path: "src/日本語 ファイル.ts", line: 29, estimated: true, more: 2 },
       commits: ["0123456", "89abcde"],
+      category: null,
     });
     assert.deepEqual(parseReplyFields(formatReply({ ...input, location: null, status: "needs_info", commits: [] })), {
       location: null,
       commits: [],
+      category: null,
     });
   });
 
@@ -185,7 +187,7 @@ describe("自動返信から場所とコミットを読み戻す（§5-1 の 6, 
     assert.equal(fixed.location?.path, "src/日本語 ファイル.ts");
     assert.deepEqual(fixed.commits, ["0123456", "89abcde"]);
     const answered = parseReplyFields(formatReply({ ...input, status: "answered", location: null, commits: [], body }));
-    assert.deepEqual(answered, { location: null, commits: [] });
+    assert.deepEqual(answered, { location: null, commits: [], category: null });
   });
 
   test("リポジトリの外を指すパスは読まない", () => {

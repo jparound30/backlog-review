@@ -42,6 +42,8 @@ export type ReviewState = {
   /** 確認②（--yes なしの post / resolve）で表示した本文のダイジェスト。--yes はこれと一致するときだけ投稿する */
   shown?: { at: string; digest: string };
   shownResolve?: { at: string; digest: string };
+  /** --yes なしの summary で表示した内容のダイジェスト（plan.md §4-5-1） */
+  shownSummary?: { at: string; digest: string };
   log: Array<{ at: string; action: string; detail?: string; commentId?: number }>;
 };
 

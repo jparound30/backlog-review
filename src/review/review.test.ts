@@ -6,7 +6,8 @@ import { after, before, describe, test } from "node:test";
 import type { BacklogClient } from "../backlog/client.ts";
 import type { BacklogComment } from "../backlog/types.ts";
 import { runGit } from "../git/git.ts";
-import { formatReplyMarker, hasSummaryMarker, parseReference, parseReplyMarker, SUMMARY_MARKER_TEXT } from "../thread/marker.ts";
+import { parseCategoryLine } from "../thread/category.ts";
+import { formatReplyMarker, hasSummaryMarker, lastLine, parseReference, parseReplyMarker, SUMMARY_MARKER_TEXT } from "../thread/marker.ts";
 import { buildThreads } from "../thread/thread.ts";
 import { parseBodyMarkers } from "../context.ts";
 import { draftCommand, postCommand, resolveCommand, type ReviewCommandContext, reviewFetchCommand, reviewSelectCommand, verifyCommand } from "./commands.ts";
@@ -209,7 +210,7 @@ describe("レビュー用の同期とスナップショット（§4-4）", () =>
 });
 
 describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5）", () => {
-  const base = { path: "src/a.ts", line: 42, severity: "warning", title: "問題", expected: "こう直す" };
+  const base = { path: "src/a.ts", line: 42, severity: "warning", category: "logic", title: "問題", expected: "こう直す" };
 
   test("検証: 必須項目・パス・行・重大度・種類", () => {
     assert.equal(validateFindings([base]).errors.length, 0);
@@ -231,6 +232,7 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
       [
         ":computer: 自動レビュー :warning: warning",
         "場所: `src/a.ts` L42",
+        "分類: 機能・ロジック",
         "指摘: 問題",
         "期待: こう直す",
         "背景: ＠user に聞いた ［review-bot summary]",
@@ -239,7 +241,7 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
       ].join("\n"),
     );
     const q = formatFinding(validateFindings([{ ...base, kind: "question", side: "old" }]).findings[0]);
-    assert.match(q, /場所: `src\/a\.ts` L42（変更前）\n質問: 問題\n確認したいこと: こう直す/);
+    assert.match(q, /場所: `src\/a\.ts` L42（変更前）\n分類: 機能・ロジック\n質問: 問題\n確認したいこと: こう直す/);
   });
 
   test("相互運用: 対応側は `場所:` から場所を読み、新しい open の指摘として扱う。マーカーは返信・サマリーに一致しない", () => {
@@ -251,6 +253,17 @@ describe("指摘の JSON・書式・対応側との相互運用（§2-1, §4-5�
     const built = buildThreads([comment(50, REVIEWER, body)], { myselfId: AUTHOR });
     assert.equal(built.threads[0].item.status, "open");
     assert.deepEqual(parseFindingMarker(body), { severity: "warning" });
+    // 分類の行は対応側が読む（plan.md §4-8）。マーカーには入れない
+    assert.equal(parseCategoryLine(body), "logic");
+    assert.doesNotMatch(lastLine(body), /category/);
+  });
+
+  test("分類（plan.md §4-8）: 必須で、一覧にない値は拒否。同じ指摘の ID は分類で変わらない", () => {
+    assert.match(validateFindings([{ ...base, category: undefined }]).errors[0], /category/);
+    assert.match(validateFindings([{ ...base, category: "bug" }]).errors[0], /category/);
+    const a = validateFindings([base]).findings[0];
+    const b = validateFindings([{ ...base, category: "security" }]).findings[0];
+    assert.equal(findingId(a), findingId(b));
   });
 
   test("指摘なしのコメント", () => {
@@ -333,12 +346,12 @@ describe("draft / select / post（§4-5, §5）", () => {
     await rm(work, { recursive: true, force: true });
   });
 
-  const f1 = { path: "feature.ts", line: 2, severity: "critical", title: "l2 がまずい", expected: "l2 を直す", evidence: "L2" };
-  const f2 = { path: "base.ts", line: 1, severity: "suggestion", title: "変更のない行", expected: "x" };
+  const f1 = { path: "feature.ts", line: 2, severity: "critical", category: "logic", title: "l2 がまずい", expected: "l2 を直す", evidence: "L2" };
+  const f2 = { path: "base.ts", line: 1, severity: "suggestion", category: "logic", title: "変更のない行", expected: "x" };
 
   test("draft: 検証・警告・一覧", async () => {
     comments = [comment(10, THIRD, "📍 feature.ts L3\n人間の指摘")];
-    const text = await draft([f1, f2, { path: "other.ts", line: 1, severity: "warning", title: "範囲外", kind: "question" }].slice(0, 2).concat([{ path: "base.ts", line: 3, severity: "warning", title: "範囲外のファイルではないが行", expected: "y" }]));
+    const text = await draft([f1, f2, { path: "other.ts", line: 1, severity: "warning", category: "logic", title: "範囲外", kind: "question" }].slice(0, 2).concat([{ path: "base.ts", line: 3, severity: "warning", category: "logic", title: "範囲外のファイルではないが行", expected: "y" }]));
     assert.match(text, /1\. :rotating_light: critical {2}指摘 .*feature\.ts L2/);
     assert.match(text, /指摘: l2 がまずい\n\s+期待: l2 を直す\n\s+根拠（投稿しない）: L2/);
     // 人間の指摘（feature.ts L3）と近い → 重複の警告
@@ -351,7 +364,7 @@ describe("draft / select / post（§4-5, §5）", () => {
     await assert.rejects(draft([{ ...f1, path: "missing.ts" }]), /PR のブランチにありません/);
     await assert.rejects(draft([{ ...f1, expected: "SECRET-KEY-VALUE を使う" }]), /API キーらしき文字列/);
     await assert.rejects(draft([f1, f1]), /2 回あります/);
-    assert.match(await draft([{ path: "other.ts", line: 1, severity: "warning", title: "範囲外", kind: "question" }]).catch((e: Error) => e.message), /PR のブランチにありません/);
+    assert.match(await draft([{ path: "other.ts", line: 1, severity: "warning", category: "logic", title: "範囲外", kind: "question" }]).catch((e: Error) => e.message), /PR のブランチにありません/);
   });
 
   test("select → post（下書き）→ post --yes → 二重投稿しない", async () => {
@@ -366,7 +379,7 @@ describe("draft / select / post（§4-5, §5）", () => {
     out.length = 0;
     await postCommand(PR, false, ctx());
     assert.equal(posted.length, 0);
-    assert.match(out.join("\n"), /--- 1\/1 feature\.ts L2 ---\n:computer: 自動レビュー :rotating_light: critical\n場所: `feature\.ts` L2\n指摘: l2 がまずい\n期待: l2 を直す\n\n`\[review-bot finding severity=critical\]`/);
+    assert.match(out.join("\n"), /--- 1\/1 feature\.ts L2 ---\n:computer: 自動レビュー :rotating_light: critical\n場所: `feature\.ts` L2\n分類: 機能・ロジック\n指摘: l2 がまずい\n期待: l2 を直す\n\n`\[review-bot finding severity=critical\]`/);
     assert.match(out.join("\n"), /下書きです/);
 
     out.length = 0;

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拡張案の検討</title>
+<style>
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --text: #1f2328;
+  --muted: #5d6470;
+  --border: #e3e0da;
+  --accent: #2f6f8f;
+  --high: #b4462f;
+  --high-bg: #fbeee9;
+  --mid: #8a6a12;
+  --mid-bg: #f8f1dc;
+  --check: #4b5a8a;
+  --check-bg: #eceef8;
+  --planned: #2d7a4f;
+  --planned-bg: #e6f4ec;
+  --code-bg: #f1efea;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17191c;
+    --surface: #1f2226;
+    --text: #e6e6e3;
+    --muted: #a0a6ae;
+    --border: #33373d;
+    --accent: #7fb6d1;
+    --high: #f0937c;
+    --high-bg: #3a2420;
+    --mid: #e0c068;
+    --mid-bg: #352d17;
+    --check: #a9b5e6;
+    --check-bg: #262a3b;
+    --planned: #7fd1a1;
+    --planned-bg: #1d3327;
+    --code-bg: #2a2d32;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17191c;
+  --surface: #1f2226;
+  --text: #e6e6e3;
+  --muted: #a0a6ae;
+  --border: #33373d;
+  --accent: #7fb6d1;
+  --high: #f0937c;
+  --high-bg: #3a2420;
+  --mid: #e0c068;
+  --mid-bg: #352d17;
+  --check: #a9b5e6;
+  --check-bg: #262a3b;
+  --planned: #7fd1a1;
+  --planned-bg: #1d3327;
+  --code-bg: #2a2d32;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+  line-height: 1.75;
+  font-size: 15px;
+}
+main { max-width: 920px; margin: 0 auto; padding: 40px 16px 80px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: 0.02em; }
+.lead { color: var(--muted); margin: 0 0 28px; }
+h2 {
+  font-size: 1.15rem;
+  margin: 44px 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.02rem; margin: 0; }
+p { margin: 8px 0; }
+code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+a { color: var(--accent); }
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.meta div {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.meta b { display: block; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin: 0 0 14px;
+}
+.card header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; margin-bottom: 6px; }
+.num { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 1px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tag.high { color: var(--high); background: var(--high-bg); }
+.tag.mid { color: var(--mid); background: var(--mid-bg); }
+.tag.check { color: var(--check); background: var(--check-bg); }
+.tag.planned { color: var(--planned); background: var(--planned-bg); }
+.tag.idea { color: var(--muted); background: var(--code-bg); }
+dl { margin: 6px 0 0; display: grid; grid-template-columns: 6.5em 1fr; gap: 4px 12px; }
+dt { color: var(--muted); font-size: 0.85rem; padding-top: 2px; }
+dd { margin: 0; }
+dd ul { margin: 0; padding-left: 1.2em; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 0.8rem; }
+tr:last-child td { border-bottom: none; }
+ol.questions li { margin-bottom: 6px; }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 560px) {
+  dl { grid-template-columns: 1fr; }
+  dt { padding-top: 6px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>拡張案の検討</h1>
+  <p class="lead">backlog-fix-review / backlog-review を、実際の請負のソフトウェア開発で便利に・有効に使うための拡張案。採用前の案を含む記録で、設計と作業の基準はあくまで <a href="plan.md">plan.md</a>・<a href="plan-review.md">plan-review.md</a>。</p>
+
+  <div class="meta">
+    <div><b>検討した日</b>2026-10-17</div>
+    <div><b>対象の版</b>20261013.1.0</div>
+    <div><b>プラン案にしたもの</b>案 1・案 2（M15・M16 / R9・R10）</div>
+  </div>
+
+  <h2>前提: いまのスキルが担っている範囲</h2>
+  <p>1 つの PR の中で「指摘 → 解釈 → 修正とコミット → 返信 → 再レビュー → 解決」を確実に回すところまでは作り込まれている（ランクの規則、2 回の確認、秘密情報の検査、4 バイト文字の対策など）。請負の現場で効いてくるのはその<strong>外側</strong>で、次の 3 つに整理した。</p>
+  <ul>
+    <li><strong>品質の記録</strong>: レビュー記録票・品質報告として、指摘と対応を後から示せること</li>
+    <li><strong>顧客との関係</strong>: 顧客のスペース・顧客のレビュアー・契約上の制約</li>
+    <li><strong>複数案件の並行</strong>: スペースや PR をまたいだ運用</li>
+  </ul>
+
+  <h2>優先度: 高（使い始めるとすぐ困るもの）</h2>
+
+  <section class="card">
+    <header><span class="num">案 1</span><h3>対応の記録の出力（レビュー記録票・品質データ）</h3><span class="tag high">高</span><span class="tag planned">実装済み（未リリース）: plan.md §5-2 / M16・R10</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>請負ではレビューの記録を品質記録や納品物として出すことが多い。いまは Backlog の画面とサマリーコメントでしか見られない。</dd>
+      <dt>案</dt><dd>「この PR のレビューの記録を出して」と頼むと（CLI の <code>export &lt;URL&gt;</code>）、指摘 1 件 = 1 行の CSV（Excel で開ける）と、集計つきの Markdown を <code>.review-state/export/</code> に出力する。列は RC・指摘日時・指摘者・出どころ・重大度・分類・要約・場所・状態・対応内容・コミット・解決日時・解決者・往復の回数など。</dd>
+      <dt>設計の要点</dt><dd><ul>
+        <li>Backlog のコメントから作り直す。状態ファイルがなくても、同じ PR なら同じ表になる</li>
+        <li>読み取りだけ。出力先は固定し、任意のパスへは書かない</li>
+        <li>CSV の数式の注入（<code>=</code> などで始まるセル）・制御文字・秘密情報を処理する</li>
+        <li>1 回に 1 つの PR。PR をまたいだ集計は、PR ごとの CSV を表計算ソフトでつなげて行う（PR の列を持つ）</li>
+      </ul></dd>
+      <dt>決定</dt><dd>両方のスキルの CLI に入れる（7-11）、CSV と Markdown（7-12）。複数 PR の指定（7-13）は 1 回に 1 つの PR に決定（2026-10-17。スキルの利用の単位に合わないため）。列の並び（7-14）は plan.md §5-2 の列で固定に決定（2026-10-17。社内の記録票の様式には合わせない）。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 2</span><h3>指摘の分類（欠陥の種別）</h3><span class="tag high">高</span><span class="tag planned">実装済み（未リリース）: plan.md §4-8 / M15・R9</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>品質報告で求められるのは件数より「どんな種類の指摘が何件か」。いまは分類を持っていない。</dd>
+      <dt>案</dt><dd>指摘 1 件に分類を 1 つ（機能・ロジック、エラー処理、セキュリティ、性能、設計・保守性、規約・書式、テスト、ドキュメント、その他）。レビュー側は指摘の JSON の <code>category</code>、対応側は解釈の JSON の <code>category</code> で付ける。</dd>
+      <dt>設計の要点</dt><dd><ul>
+        <li>マーカーには入れず、本文の決まった行（<code>分類:</code> / <code>**分類**:</code>）に書く。返信マーカーの正規表現は厳密で、項目を足すと以前の版が自動返信を新しい指摘と取り違えるため</li>
+        <li>ランク・返信の状態には使わない（表示と記録だけ）</li>
+        <li>人間のレビュアーには書くことを求めない（ルールを増やさない）</li>
+      </ul></dd>
+      <dt>決定</dt><dd>分類の一覧は既定の 9 分類で固定（7-10、2026-10-17。社内の欠陥分類には合わせない）。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 3</span><h3>複数の Backlog スペースの切り替え</h3><span class="tag high">高</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>顧客ごとに別のスペースに招待されることが多い。いまは <code>BACKLOG_SPACE</code> と <code>BACKLOG_API_KEY</code> が 1 組だけ。</dd>
+      <dt>案</dt><dd><ul>
+        <li>(a) README に、direnv などでリポジトリごとに環境変数を切り替える運用を書く（コードの変更なし）</li>
+        <li>(b) スペースごとのキー（例: <code>BACKLOG_API_KEY__&lt;space&gt;</code>）を持てるようにする</li>
+      </ul></dd>
+      <dt>注意</dt><dd>(b) はキーの送り先の制限（plan.md §6）に関わるので慎重に。まず (a) を推奨。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 4</span><h3>顧客のレビュアーへの配慮</h3><span class="tag high">高</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>必須のルール（<code>RC-番号</code>・<code>RC-番号 ✅</code>）を顧客に守ってもらえるとは限らず、守られないと「確認待ち」のまま残り続ける。返信の文面や「自動対応」の表示が顧客にどう映るかも気になる。</dd>
+      <dt>案</dt><dd><ul>
+        <li>長く <code>fixed</code> のままの指摘を、サマリーで目立たせる</li>
+        <li>顧客がメールなど別の経路で了承したとき、利用者本人が理由を添えて解決にする手順を用意する</li>
+        <li>返信の文体（敬語の度合い）を設定できるようにする</li>
+      </ul></dd>
+      <dt>確認</dt><dd>顧客側のレビュアーが Backlog に直接コメントする運用かどうかで、優先度が変わる。</dd>
+    </dl>
+  </section>
+
+  <h2>優先度: 中（効率と信頼性を上げるもの）</h2>
+
+  <section class="card">
+    <header><span class="num">案 5</span><h3>Backlog 課題（チケット）との連携</h3><span class="tag mid">中</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>案</dt><dd>PR に紐づく課題の説明・受け入れ条件を取得し、レビュー側では「要件どおりか」の観点に、対応側では意図の判定の材料に使う。</dd>
+      <dt>注意</dt><dd>新しく使う API（課題の取得）になるので、plan.md §2 の「使用する API」の更新が要る。課題へのコメントや状態の変更は外向きの操作なので、入れるなら別の確認を挟む。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 6</span><h3>自分の番の PR の一覧</h3><span class="tag mid">中</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>案</dt><dd>プロジェクトやリポジトリをまたいで、自分が関わる PR のうち返信待ち・確認待ちの指摘があるものを一覧にする（読み取りだけ）。複数の案件を並行するときに追いやすくする。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 7</span><h3>担当の引き継ぎ</h3><span class="tag mid">中</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>いまは「1 つの PR は同じ人のアカウントでだけ対応する」前提（plan.md §4-6）。請負のチームでは担当の交代や休暇の代理が起こりうる。</dd>
+      <dt>案</dt><dd>引き継ぐ相手のユーザー ID を明示して、その人の返信マーカーも Bot の返信として読む。</dd>
+      <dt>注意</dt><dd>なりすましへの備えの前提を変えるので、需要が出てから検討する。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 8</span><h3>作業の準備の自動化</h3><span class="tag mid">中</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>案</dt><dd>PR の URL から、PR のブランチの worktree を作る手順を用意する。試験運用（M5）でも手作業だった。</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 11</span><h3>サマリーを PR の説明文に置く</h3><span class="tag mid">中</span><span class="tag planned">実装済み（未リリース）: plan.md §4-5-1 / M17・R11</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>サマリーはコメントなので、更新できるのは投稿した本人（対応側）だけ。レビュー側が解決を投稿しても、サマリーは対応側が次に動くまで古いまま。</dd>
+      <dt>案</dt><dd>PR の説明文の末尾に、印で囲んだ区画を置き、どちらのスキルからも更新する。更新できなければ、対応側だけが今までどおりコメントを使う（2026-10-17 に (c) で決定）。</dd>
+      <dt>注意</dt><dd><ul>
+        <li>作成者が書いた部分には触れない。印が壊れていたら止める</li>
+        <li>API に版の確認がないので、更新の直前に読み直して変わっていれば止める（短い時間の取りこぼしは受け入れる）</li>
+        <li>テスト用 PR で確かめること: 作成者以外が更新できるか、更新が変更の記録としてうるさく残らないか、HTML のコメントが見えないか、長さの上限、権限がないときのエラー</li>
+      </ul></dd>
+    </dl>
+  </section>
+
+  <h2>要確認（スキルだけでは解決できず、運用で決めること）</h2>
+
+  <section class="card">
+    <header><span class="num">案 9</span><h3>顧客のコードを LLM に送ってよいか</h3><span class="tag check">要確認</span><span class="tag idea">未着手</span></header>
+    <dl>
+      <dt>困りごと</dt><dd>請負契約や秘密保持契約で、生成 AI の利用や外部への送信が制限されていることがある。</dd>
+      <dt>案</dt><dd><ul>
+        <li>使ってよいプロジェクトの許可リスト（プロジェクトキーの単位）を持ち、ほかの顧客で使う事故を防ぐ。いまは <code>BACKLOG_SPACE</code> でスペースを 1 つに限っているだけ</li>
+        <li>README に「契約上の確認」の注意を加える（安価で効果がある）</li>
+      </ul></dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <header><span class="num">案 10</span><h3>監査ログ</h3><span class="tag check">要確認</span><span class="tag idea">案 1 に含められる</span></header>
+    <dl>
+      <dt>案</dt><dd>誰の承認で何を投稿し、何をコミットしたかの記録。状態ファイルの <code>log</code> にはすでに操作記録があるので、案 1 の出力に含められる。</dd>
+    </dl>
+  </section>
+
+  <h2>案 1・案 2 を詰める中で出てきた派生案（初版では入れない）</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>派生案</th><th>内容</th><th>入れない理由・入れる条件</th></tr></thead>
+      <tbody>
+        <tr><td>分類の一覧のカスタマイズ</td><td>会社や顧客ごとの欠陥分類を、利用側のリポジトリ（base ブランチ）に置いた一覧で定義する</td><td>一覧の検証と、リポジトリをまたぐ集計が複雑になる。既定の 9 分類が実際の様式と合わなければ入れる（7-10 の (b)）</td></tr>
+        <tr><td>複数 PR・期間を指定した集計</td><td>URL を並べる、またはリポジトリと期間を指定して PR の一覧の API で探し、月次の品質報告を作る</td><td>スキルの利用の単位（1 回に 1 つの PR）に合わないので見送り（7-13、2026-10-17）。PR ごとの CSV をつなげれば集計できる</td></tr>
+        <tr><td>xlsx での出力</td><td>Excel の形式で直接出す</td><td>依存パッケージが要り、「実行時の依存なし」（plan.md §7-A）に反する。CSV で足りるか確かめる</td></tr>
+        <tr><td>作り込み工程</td><td>指摘ごとに、欠陥を作り込んだ工程（要件・設計・実装）を記録する</td><td>エージェントには判断しにくく、利用者の入力が要る。品質報告で必須なら検討する</td></tr>
+        <tr><td>重大度を人間の指摘にも付ける</td><td>対応側の解釈で、人間のレビュアーの指摘にも重大度を付ける</td><td>重大度はレビュアーが決めるもので、対応側が付けると食い違う。分類と同じく、人間が書いたものだけを読む案もある</td></tr>
+        <tr><td>再発防止の提案</td><td>分類の集計から、利用側のレビュー観点のドキュメントへの追記を提案する</td><td>案 1・案 2 で集計できるようになってから（plan-review.md §7-10 で見送ったものの発展）</td></tr>
+        <tr><td>効果の測定</td><td>自動修正の割合、往復の回数、解決までの日数を PR をまたいで出し、導入の効果を示す</td><td>PR ごとの CSV をつなげた集計で足りるかを、使ってみてから決める</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>利用者に確かめたいこと</h2>
+  <ol class="questions">
+    <li>顧客側のレビュアーは Backlog に直接コメントするか、社内のレビュアーが中心か（案 4・案 7 の優先度）</li>
+    <li><s>品質記録に決まった様式があるか（7-14）</s> → 様式はあるが合わせる必要はない（2026-10-17 回答）</li>
+    <li><s>品質報告で使う欠陥分類の決まりがあるか（7-10）</s> → 決まりはあるが合わせる必要はない（2026-10-17 回答）</li>
+  </ol>
+
+  <footer>この文書は検討の記録。決まったことは plan.md・plan-review.md に反映し、そちらを正とする。</footer>
+</main>
+</body>
+</html>

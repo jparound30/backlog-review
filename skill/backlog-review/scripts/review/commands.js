@@ -7,6 +7,8 @@ import { blobIdAt, readBlob } from "../git/git.js";
 import { firstLine } from "../reply/format.js";
 import { saveJsonAtomic } from "../state/store.js";
 import { replaceFourByteChars } from "../text.js";
+import { summaryCommand as runSummary } from "../summary/command.js";
+import { categoryLabel } from "../thread/category.js";
 import { label, neutralize, parseItemKey } from "../thread/marker.js";
 import { verifyItems } from "./verify.js";
 const digest = (text) => createHash("sha256").update(text).digest("hex");
@@ -156,6 +158,7 @@ function printDraft(n, d, state, ctx) {
     const head = f ? `${SEVERITY_MARK[f.severity]}  ${f.kind === "question" ? "質問" : "指摘"}` : SEVERITY_MARK.none;
     ctx.out(`${String(n).padStart(3)}. ${pad(head, 22)} ${f ? `${f.path} ${f.side === "old" ? "旧" : ""}L${f.line}` : ""}${posted ? `  （投稿済み: #${posted.commentId}）` : ""}`);
     if (f) {
+        ctx.out(`       分類: ${categoryLabel(f.category)}`);
         ctx.out(`       ${f.kind === "question" ? "質問" : "指摘"}: ${f.title}`);
         if (f.expected)
             ctx.out(`       ${f.kind === "question" ? "確認したいこと" : "期待"}: ${f.expected}`);
@@ -540,4 +543,27 @@ export async function resolveCommand(pr, file, post, ctx) {
         process.exitCode = 1;
         ctx.out(`\n✖ ${failed} 件の投稿に失敗しました。「応答がありませんでした」なら status で確かめてから、失敗したものだけを再実行する`);
     }
+}
+/**
+ * サマリーを PR の説明文の区画に反映する（plan.md §4-5-1・R11）。内容と手順は対応側と同じ。
+ * 説明文を更新できなければ、サマリーコメントは投稿しない（§2-3）
+ */
+export async function reviewSummaryCommand(pr, post, ctx) {
+    const path = reviewStatePath(ctx.stateRoot, pr);
+    await runSummary(pr, ctx, {
+        post,
+        side: "review",
+        saveShown: async (digest) => {
+            const state = await loadReviewState(path, pr);
+            state.shownSummary = { at: new Date().toISOString(), digest };
+            await saveJsonAtomic(path, state);
+        },
+        loadShown: async () => (await loadReviewState(path, pr)).shownSummary?.digest,
+        log: async (action, commentId) => {
+            const state = await loadReviewState(path, pr);
+            state.shownSummary = undefined;
+            state.log.push({ at: new Date().toISOString(), action, ...(commentId !== undefined ? { commentId } : {}) });
+            await saveJsonAtomic(path, state);
+        },
+    });
 }

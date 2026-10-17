@@ -5,10 +5,11 @@ import { loadState, saveJsonAtomic, snapshotPath, statePath } from "./state/stor
 import { isUnsafePath } from "./text.js";
 import { itemContexts } from "./context.js";
 import { parseReplyFields } from "./reply/format.js";
+import { parseCategoryLine } from "./thread/category.js";
 import { label } from "./thread/marker.js";
 import { buildThreads } from "./thread/thread.js";
 /** 同じコミットは、短い ID の一致でまとめる */
-function mergeCommits(known, replied) {
+export function mergeCommits(known, replied) {
     const merged = [...known];
     for (const sha of replied) {
         if (!merged.some((m) => m.startsWith(sha) || sha.startsWith(m)))
@@ -45,6 +46,35 @@ export async function resolveRef(repoDir, ref) {
 function isInterpretationValid(interp, root, lastHumanCommentId) {
     return root !== undefined && interp.rootUpdated === root.updated && interp.lastHumanCommentId === lastHumanCommentId;
 }
+/**
+ * 状態ファイルの解釈のうち、今のコメントに対して使えるもの。
+ * 編集された root の解釈は捨てる。
+ * 状態ファイルは書き換えられる可能性があるので、解釈はエージェントの入力と同じ検査をし直し（S-7）、
+ * 保存されたランクと返信の状態は使わず、判定から求め直す（§3-3）。
+ * 以前の形（分割した key・points のない解釈）は通らないので、解釈し直しになる
+ */
+export function validInterpretations(state, byId) {
+    const interpretations = new Map();
+    for (const [key, stored] of Object.entries(state.interpretations)) {
+        const interp = stored;
+        if (!interp || interp.key !== key)
+            continue;
+        const { items, errors } = validateInterpretations([{ key: interp.key, category: interp.category, points: interp.points }]);
+        if (errors.length > 0 || typeof interp.rootUpdated !== "string" || byId.get(Number(key))?.updated !== interp.rootUpdated)
+            continue;
+        if (typeof interp.lastHumanCommentId !== "number" || typeof interp.interpretedAt !== "string")
+            continue;
+        interpretations.set(key, {
+            key,
+            ...(items[0].category ? { category: items[0].category } : {}),
+            ...assessInterpretation(items[0].points),
+            rootUpdated: interp.rootUpdated,
+            lastHumanCommentId: interp.lastHumanCommentId,
+            interpretedAt: interp.interpretedAt,
+        });
+    }
+    return interpretations;
+}
 export async function sync(pr, ctx, prefetched) {
     const [myself, pullRequest, comments] = prefetched
         ? [prefetched.myself, prefetched.pullRequest, prefetched.comments]
@@ -55,28 +85,7 @@ export async function sync(pr, ctx, prefetched) {
     if (state.myselfId !== null && state.myselfId !== myself.id) {
         throw new Error(`状態ファイルは別のユーザー（id=${state.myselfId}）で作られています。API キーを確認してください: ${path}`);
     }
-    // 編集された root の解釈は捨てる。
-    // 状態ファイルは書き換えられる可能性があるので、解釈はエージェントの入力と同じ検査をし直し（S-7）、
-    // 保存されたランクと返信の状態は使わず、判定から求め直す（§3-3）。
-    // 以前の形（分割した key・points のない解釈）は通らないので、解釈し直しになる
-    const interpretations = new Map();
-    for (const [key, stored] of Object.entries(state.interpretations)) {
-        const interp = stored;
-        if (!interp || interp.key !== key)
-            continue;
-        const { items, errors } = validateInterpretations([{ key: interp.key, points: interp.points }]);
-        if (errors.length > 0 || typeof interp.rootUpdated !== "string" || byId.get(Number(key))?.updated !== interp.rootUpdated)
-            continue;
-        if (typeof interp.lastHumanCommentId !== "number" || typeof interp.interpretedAt !== "string")
-            continue;
-        interpretations.set(key, {
-            key,
-            ...assessInterpretation(items[0].points),
-            rootUpdated: interp.rootUpdated,
-            lastHumanCommentId: interp.lastHumanCommentId,
-            interpretedAt: interp.interpretedAt,
-        });
-    }
+    const interpretations = validInterpretations(state, byId);
     const built = buildThreads(comments, { myselfId: myself.id, interpretations });
     const refs = await refsOf(ctx.repoDir, pullRequest);
     const locationCache = new Map();
@@ -121,6 +130,8 @@ export async function sync(pr, ctx, prefetched) {
             // 状態ファイルがなくても、自分の自動返信から読み戻せるようにする（§5-1 の 6）
             commits: mergeCommits((state.commits[item.key] ?? []).filter(isObjectId), botReplies.flatMap((r) => parseReplyFields(r.content).commits)),
             lastReplyLocation: botReplies.length > 0 ? parseReplyFields(botReplies.at(-1).content).location : null,
+            rootCategory: parseCategoryLine(rootSnapshot.content),
+            lastReplyCategory: botReplies.length > 0 ? parseReplyFields(botReplies.at(-1).content).category : null,
         });
     }
     const counts = {};

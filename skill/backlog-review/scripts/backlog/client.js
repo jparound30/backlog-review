@@ -150,6 +150,17 @@ export class BacklogClient {
         this.assertSafeContent(content);
         return this.request("POST", this.buildUrl(`${this.pullRequestPath(pr)}/comments`), new URLSearchParams({ content }));
     }
+    /**
+     * PR の説明文を更新する（plan.md §4-5-1）。送るのは `description` だけで、通知の指定は付けない。
+     * 説明文には PR の作成者が書いた部分があるので、4 バイト文字の置き換えと秘密情報の検査は、
+     * 呼び出し側が渡す自分の部分（`ownPart`）にだけかける。作成者の部分はすでに Backlog にある文で、変えない
+     */
+    async updatePullRequestDescription(pr, description, ownPart) {
+        if (!description.includes(ownPart))
+            throw new Error("説明文に、更新する区画が含まれていません");
+        this.assertSafeContent(ownPart);
+        return this.request("PATCH", this.buildUrl(this.pullRequestPath(pr)), new URLSearchParams({ description }));
+    }
     /** 認証ユーザー自身が投稿したコメントのみ更新できる */
     async updateComment(pr, commentId, body) {
         const content = replaceFourByteChars(body);

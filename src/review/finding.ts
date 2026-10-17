@@ -4,6 +4,7 @@
  */
 import { createHash } from "node:crypto";
 import { isRepoRelativePath, isUnsafePath, replaceFourByteChars } from "../text.ts";
+import { type Category, CATEGORY_CODES, formatCategoryLine, isCategory } from "../thread/category.ts";
 import { lastLine, neutralize } from "../thread/marker.ts";
 
 /** 重大度。`none` は「指摘なし」のコメント（§2-3） */
@@ -48,6 +49,8 @@ export type FindingInput = {
   line: number;
   side: "new" | "old";
   severity: Exclude<FindingSeverity, "none">;
+  /** 指摘の分類（plan.md §4-8）。本文の `場所:` の次の行に書く。判定には使わない */
+  category: Category;
   kind: FindingKind;
   title: string;
   expected: string | null;
@@ -109,6 +112,7 @@ export function validateFindings(data: unknown): { findings: FindingInput[]; err
     const side = f.side ?? "new";
     if (side !== "new" && side !== "old") errors.push(`${at}.side は new か old にしてください`);
     if (!isFindingSeverity(f.severity) || f.severity === "none") errors.push(`${at}.severity は critical / warning / suggestion のどれかにしてください`);
+    if (!isCategory(f.category)) errors.push(`${at}.category は ${CATEGORY_CODES.join(" / ")} のどれかにしてください`);
     const kind = f.kind ?? "fix";
     if (kind !== "fix" && kind !== "question") errors.push(`${at}.kind は fix か question にしてください`);
     const title = text(f.title, `${at}.title`, errors, true);
@@ -121,6 +125,7 @@ export function validateFindings(data: unknown): { findings: FindingInput[]; err
       line: f.line as number,
       side: side as "new" | "old",
       severity: f.severity as FindingInput["severity"],
+      category: f.category as Category,
       kind: kind as FindingKind,
       title: title!,
       expected,
@@ -168,6 +173,7 @@ export function formatFinding(f: FindingInput): string {
   const lines = [
     `${FINDING_HEADLINE} ${SEVERITY_MARK[f.severity]}`,
     `場所: \`${safe(f.path)}\` ${where}`,
+    formatCategoryLine(f.category),
     `${f.kind === "question" ? "質問" : "指摘"}: ${safe(f.title)}`,
   ];
   if (f.expected) lines.push(`${f.kind === "question" ? "確認したいこと" : "期待"}: ${safe(f.expected)}`);

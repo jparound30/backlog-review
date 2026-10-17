@@ -26,6 +26,8 @@ import {
   sync,
   type SyncContext,
 } from "./sync.ts";
+import { type Category, CATEGORY_CODES, categoryLabel } from "./thread/category.ts";
+import { summaryCommand as runSummary } from "./summary/command.ts";
 import { isReplyStatus, label, parseItemKey, type ReplyStatus } from "./thread/marker.ts";
 import { parseFindingMarker } from "./review/finding.ts";
 
@@ -208,9 +210,18 @@ export async function interpretCommand(pr: PullRequestRef, file: string, ctx: Co
     }
     const checked = await checkPointFiles(input.points, snapshot.refs, ctx.repoDir, input.key);
     problems.push(...checked.problems);
-    fileNotes.set(input.key, checked.notes);
+    // 分類は品質記録のために指摘ごとに 1 つ付ける（§4-8）。root に `分類:` があればレビュアーの分類を使う
+    const notes = [...checked.notes];
+    if (item.rootCategory === null && input.category === undefined && input.points.some((p) => p.kind !== "not_actionable")) {
+      problems.push(`${label(input.key)} category（指摘の分類）がありません。${CATEGORY_CODES.join(" / ")} のどれかを書いてください`);
+    }
+    if (item.rootCategory !== null && input.category !== undefined && input.category !== item.rootCategory) {
+      notes.push(`分類は、指摘に書かれた「${categoryLabel(item.rootCategory)}」を使います（解釈の ${input.category} は使いません）`);
+    }
+    fileNotes.set(input.key, notes);
     state.interpretations[input.key] = {
       key: input.key,
+      ...(input.category ? { category: input.category } : {}),
       ...assessInterpretation(input.points),
       rootUpdated: item.root.updated,
       lastHumanCommentId: item.replyToId,
@@ -241,6 +252,8 @@ export async function interpretCommand(pr: PullRequestRef, file: string, ctx: Co
     const head = multiple ? `論点 ${interp.points.length} 件` : pointLabel(interp.points[0]);
     const auto = autoReviewNote(item.root.content);
     ctx.out(`${String(++n).padStart(3)}. ${pad(item.label, 14)} ${pad(head, 14)} 返信: ${interp.replyStatus}  ランク: ${interp.rank ?? "-"}${auto ? `  ${auto}` : ""}`);
+    const category = itemCategory(item);
+    ctx.out(`       分類: ${category ? categoryLabel(category) : "なし"}${item.rootCategory ? "（指摘に書かれたもの）" : ""}`);
     // 論点を書かずに落としていないかを利用者が見比べられるよう、元のコメントの全文を出す（R-5）
     ctx.out("       元のコメント:");
     for (const line of quoteBlock(item.root.content)) ctx.out(line);
@@ -278,6 +291,11 @@ export async function interpretCommand(pr: PullRequestRef, file: string, ctx: Co
   latest.listed = { at: now, keys: listed };
   await saveJsonAtomic(statePath(ctx.stateRoot, pr), latest);
   ctx.out(`\n利用者の回答は select で番号を指摘に置き換える（例: select … --choice '1,3-5'）`);
+}
+
+/** 指摘の分類（§4-8）。レビュアーが root に書いたものを、解釈の分類より優先する */
+export function itemCategory(item: SnapshotItem): Category | null {
+  return item.rootCategory ?? item.interpretation?.category ?? null;
 }
 
 function replyLocation(item: SnapshotItem): ReplyLocation | null {
@@ -530,6 +548,7 @@ async function prepareReply(
     quoteSource: summaryLine(target.content),
     status,
     location: replyLocation(item),
+    category: itemCategory(item),
     body,
     commits: fullCommits,
     rankReasons:
@@ -703,33 +722,26 @@ export async function selectCommand(pr: PullRequestRef, choice: string, ctx: Com
 }
 
 /** §4-5: サマリーコメントを作成、または更新する */
+/** サマリーを更新する（§4-5・§4-5-1）。PR の説明文の区画を基本にし、更新できなければサマリーコメント */
 export async function summaryCommand(pr: PullRequestRef, post: boolean, ctx: CommandContext): Promise<void> {
-  const { snapshot } = await sync(pr, ctx);
-  const text = formatSummary(
-    snapshot.items.map((item) => ({
-      key: item.key,
-      reviewerName: item.root.author.name,
-      summary: firstLine(summaryLine(item.root.content), 30),
-      status: item.status,
-      location: replyLocation(item),
-      commits: item.commits,
-      rootId: item.root.id,
-      latestReplyId: item.botReplyIds.at(-1) ?? null,
-    })),
-  );
-  if (!post) {
-    ctx.out(`--- ${snapshot.summaryCommentId ? `#${snapshot.summaryCommentId} を更新` : "新規に投稿"}する内容（--yes を付けると反映します）---`);
-    ctx.out(text);
-    return;
-  }
-  const result = snapshot.summaryCommentId
-    ? await ctx.client.updateComment(pr, snapshot.summaryCommentId, text)
-    : await ctx.client.postComment(pr, text);
-  const state = await loadState(statePath(ctx.stateRoot, pr), pr);
-  state.summaryCommentId = result.id;
-  state.log.push({ at: new Date().toISOString(), action: snapshot.summaryCommentId ? "summary:update" : "summary:create", commentId: result.id });
-  await saveJsonAtomic(statePath(ctx.stateRoot, pr), state);
-  ctx.out(`サマリーを${snapshot.summaryCommentId ? "更新" : "投稿"}しました: #${result.id}`);
+  const path = statePath(ctx.stateRoot, pr);
+  await runSummary(pr, ctx, {
+    post,
+    side: "fix",
+    saveShown: async (digest) => {
+      const state = await loadState(path, pr);
+      state.shownSummary = { at: new Date().toISOString(), digest };
+      await saveJsonAtomic(path, state);
+    },
+    loadShown: async () => (await loadState(path, pr)).shownSummary?.digest,
+    log: async (action, commentId) => {
+      const state = await loadState(path, pr);
+      if (commentId !== undefined && (action === "summary:create" || action === "summary:update")) state.summaryCommentId = commentId;
+      state.shownSummary = undefined;
+      state.log.push({ at: new Date().toISOString(), action, ...(commentId !== undefined ? { commentId } : {}) });
+      await saveJsonAtomic(path, state);
+    },
+  });
 }
 
 /**

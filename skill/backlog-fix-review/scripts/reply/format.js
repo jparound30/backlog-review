@@ -1,4 +1,5 @@
 import { isRepoRelativePath, isUnsafePath, replaceFourByteChars } from "../text.js";
+import { formatReplyCategoryLine, parseReplyCategoryLine } from "../thread/category.js";
 import { escapeQuoted, formatReplyMarker, parseReplyMarker, label, neutralize, SUMMARY_MARKER_TEXT } from "../thread/marker.js";
 const STATUS_LABEL = {
     fixed: "✅ 対応済み",
@@ -32,7 +33,7 @@ export function quoteLine(content, max = 60) {
     return escapeQuoted(firstLine(content, max));
 }
 /** マークダウンの表を壊さないよう、セルの中身を 1 行にして `|` を逃がす */
-function cell(text, max = 60) {
+export function cell(text, max = 60) {
     const oneLine = text.replace(/\s+/g, " ").trim();
     const short = oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
     return escapeQuoted(short).replace(/\|/g, "\\|");
@@ -52,6 +53,7 @@ export function formatReply(input) {
         "",
         `**状態**: ${STATUS_LABEL[input.status]}`,
         `**場所**: ${formatLocation(input.location)}`,
+        ...(input.category ? [formatReplyCategoryLine(input.category)] : []),
         `**${BODY_HEADING[input.status]}**: ${neutralize(input.body.trim())}`,
     ];
     if (input.rankReasons && input.rankReasons.length > 0) {
@@ -67,7 +69,7 @@ export function formatReply(input) {
 /**
  * 自分の自動返信から、CLI が書いた「場所」と「コミット」を読み戻す（§5-1 の 6, R-14）。
  * 本文（エージェントが書く）に同じ形の行があっても取り違えないよう、決まった位置の行だけを読む:
- * 場所は「**状態**:」の次の行、コミットはマーカーの直前の行。
+ * 場所は「**状態**:」の次の行、分類はその次の行（§4-8。以前の版の返信にはない）、コミットはマーカーの直前の行。
  * コミットは fixed の返信にだけ付き、fixed には必ず付く（§3-1）。fixed 以外ではマーカーの直前が本文になりうるので読まない
  */
 export function parseReplyFields(content) {
@@ -80,7 +82,36 @@ export function parseReplyFields(content) {
     const filled = lines.filter((l) => l !== "");
     const fixed = parseReplyMarker(content)?.status === "fixed";
     const commitLine = fixed ? /^\*\*コミット\*\*: ([0-9a-f]{7,64}(?:, [0-9a-f]{7,64})*)$/.exec(filled.at(-2) ?? "") : null;
-    return { location, commits: commitLine ? commitLine[1].split(", ") : [] };
+    // 場所の行がある返信だけ読む（CLI が書いた形の返信に限る）
+    const category = status >= 0 && lines[status + 1]?.startsWith("**場所**:") ? parseReplyCategoryLine(lines[status + 2] ?? "") : null;
+    return { location, commits: commitLine ? commitLine[1].split(", ") : [], category };
+}
+/**
+ * 自分の自動返信から、本文の項目（`**対応内容**:`・`**回答**:` など）を読み戻す（§5-2）。
+ * 見出しの行から、CLI が本文の後に書く行（自動で修正しなかった理由・コミット・マーカー）の前まで。
+ * CLI が書く行は下から順に取り除くので、本文に同じ形の行があっても、本文の終わりを取り違えない
+ */
+export function parseReplyBody(content) {
+    const status = parseReplyMarker(content)?.status;
+    if (!status)
+        return null;
+    const lines = content.split("\n");
+    const prefix = `**${BODY_HEADING[status]}**: `;
+    const start = lines.findIndex((l) => l.startsWith(prefix));
+    if (start < 0)
+        return null;
+    let end = lines.length;
+    while (end > start + 1 && lines[end - 1].trim() === "")
+        end--;
+    end--; // マーカーの行
+    while (end > start + 1 && lines[end - 1].trim() === "")
+        end--;
+    if (status === "fixed" && end > start + 1 && /^\*\*コミット\*\*: /.test(lines[end - 1]))
+        end--;
+    if (end > start + 1 && lines[end - 1].startsWith("**自動で修正しなかった理由**: "))
+        end--;
+    const body = [lines[start].slice(prefix.length), ...lines.slice(start + 1, end)].join("\n").trim();
+    return body === "" ? null : body;
 }
 /**
  * 同じ PR の画面の中のコメントへのリンク（`#comment-{ID}`）。
@@ -116,8 +147,11 @@ export function formatProgress(statuses) {
     const waitingBot = counted.filter((s) => s === "open").length;
     return `進み具合: ☑️ 完了 ${done} / ${counted.length} 件（レビュアーの確認待ち ${waitingReviewer} 件・自動対応待ち ${waitingBot} 件）`;
 }
-/** サマリーコメント（§4-5）。not_actionable は出さない */
-export function formatSummary(rows, now = new Date()) {
+/**
+ * サマリー（§4-5）。not_actionable は出さない。要約の列は省略しない（§4-5-1。エスケープはほかのセルと同じ）。
+ * PR の説明文の区画に置くとき（§4-5-1）は `marker: false` にする。説明文ではマーカーを読まないため
+ */
+export function formatSummary(rows, now = new Date(), options = {}) {
     const visible = rows.filter((r) => r.status !== "not_actionable");
     const lines = [`## :computer: レビュー対応状況（最終更新: ${formatJst(now)}）`, ""];
     if (visible.length === 0) {
@@ -131,10 +165,12 @@ export function formatSummary(rows, now = new Date()) {
             const commits = shas.length > 0 ? shas.map((sha) => sha.slice(0, 7)).join(", ") : "-";
             const rc = commentLink(label(r.key), r.rootId);
             const latest = r.latestReplyId ? commentLink(`#${r.latestReplyId}`, r.latestReplyId) : "-";
-            lines.push(`| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`);
+            lines.push(`| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`);
         }
     }
     // マーカーは最後の行でないと働かないので、「次にすること」はその前に置く（§6-1）
-    lines.push("", ...NEXT_STEPS, "", SUMMARY_MARKER_TEXT);
+    lines.push("", ...NEXT_STEPS);
+    if (options.marker ?? true)
+        lines.push("", SUMMARY_MARKER_TEXT);
     return replaceFourByteChars(lines.join("\n"));
 }
