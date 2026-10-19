@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { BacklogApiError } from "../backlog/client.js";
 import { collectRecords } from "../export/command.js";
+import { OUTCOME_LABEL } from "../export/format.js";
 import { formatSummary } from "../reply/format.js";
 import { hasSummaryMarker, SUMMARY_MARKER_TEXT } from "../thread/marker.js";
 import { applyBlock, formatBlock, locateBlock } from "./description.js";
@@ -22,6 +23,8 @@ function toRows(records) {
         commits: r.commits,
         rootId: r.rootId,
         latestReplyId: r.lastReplyId,
+        // 完了した指摘の決着（§7-16）。確認中（needs_info）のまま解決したものは添えない
+        outcome: r.status === "resolved" && r.outcome && r.outcome !== "needs_info" ? OUTCOME_LABEL[r.outcome] : null,
     }));
 }
 /** 説明文の更新を「できない」とみなすエラー（権限がない・長すぎる・文字を拒否された, §4-5-1 の V4・V5） */

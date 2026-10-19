@@ -3,7 +3,7 @@ import {} from "../git/diff.js";
 import { firstLine, parseReplyBody, parseReplyFields } from "../reply/format.js";
 import { parseFindingMarker } from "../review/finding.js";
 import { parseCategoryLine } from "../thread/category.js";
-import { hasSummaryMarker, label } from "../thread/marker.js";
+import { hasSummaryMarker, isWithdrawal, label } from "../thread/marker.js";
 import { buildThreads } from "../thread/thread.js";
 /**
  * 自動レビューの指摘なら `指摘:`・`質問:` の行を、なければ最初の行を要約にする。
@@ -98,6 +98,7 @@ export async function buildRecords(input) {
             location,
             status: item.status,
             lastReplyStatus: last?.status ?? null,
+            outcome: resolveComment && isWithdrawal(resolveComment.content ?? "") ? "withdrawn" : (last?.status ?? null),
             response: last ? parseReplyBody(last.comment.content ?? "") : null,
             commits,
             lastReplyAt: last?.comment.created ?? null,

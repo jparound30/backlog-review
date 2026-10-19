@@ -80,6 +80,19 @@ describe("formatSummary", () => {
   test("指摘がなければその旨を書く", () => {
     assert.match(formatSummary([]), /対応が必要な指摘はありません/);
   });
+
+  test("resolved には決着を括弧で添える。進み具合の数え方は変えない（§7-16）", () => {
+    const base = { reviewerName: "a", summary: "s", location: null, commits: [] };
+    const text = formatSummary([
+      { ...base, key: "1", status: "resolved", outcome: "見送り" },
+      { ...base, key: "2", status: "resolved", outcome: null },
+      { ...base, key: "3", status: "wontfix", outcome: "見送り" },
+    ]);
+    assert.match(text, /\| RC-1 \| a \| s \| ☑️ resolved（見送り） \|/);
+    assert.match(text, /\| RC-2 \| a \| s \| ☑️ resolved \|/);
+    assert.match(text, /\| RC-3 \| a \| s \| :no_good: wontfix \|/);
+    assert.match(text, /☑️ 完了 2 \/ 3 件/);
+  });
 });
 
 test("quoteLine は長い行を切り詰める", () => {

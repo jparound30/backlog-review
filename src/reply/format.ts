@@ -149,6 +149,8 @@ export type SummaryRow = {
   rootId?: number;
   /** その指摘への最後の自動返信のコメント ID（「最新の返信」列のリンク先） */
   latestReplyId?: number | null;
+  /** 完了した指摘がどう決着したか（修正・回答・見送り・取り下げ）。resolved のときだけ括弧で添える（§4-5, §7-16） */
+  outcome?: string | null;
 };
 
 /**
@@ -174,7 +176,7 @@ export const NEXT_STEPS = [
   "- ✅ fixed → 確認して問題なければ `RC-番号 ✅`、直っていなければ `RC-番号 理由`",
   "- ❓ needs_info → `RC-番号 回答` で答える",
   "- :speech_balloon: answered / :no_good: wontfix → 納得なら `RC-番号 ✅`、そうでなければ `RC-番号 理由`",
-  "- ☑️ resolved → 完了（何もしなくてよい）",
+  "- ☑️ resolved → 完了（何もしなくてよい。括弧の中はどう決着したか）",
   "- 対応不要にする → `RC-番号 ✅ 対応不要`",
   "- 新しく指摘する → 行コメントで付ける（または `場所: ファイル L行`）。1 コメントに 1 指摘",
 ];
@@ -208,8 +210,9 @@ export function formatSummary(rows: SummaryRow[], now = new Date(), options: { m
       const commits = shas.length > 0 ? shas.map((sha) => sha.slice(0, 7)).join(", ") : "-";
       const rc = commentLink(label(r.key), r.rootId);
       const latest = r.latestReplyId ? commentLink(`#${r.latestReplyId}`, r.latestReplyId) : "-";
+      const status = SUMMARY_STATUS_LABEL[r.status] + (r.status === "resolved" && r.outcome ? `（${cell(r.outcome)}）` : "");
       lines.push(
-        `| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`,
+        `| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${status} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`,
       );
     }
   }

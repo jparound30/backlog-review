@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import type { BacklogComment } from "../backlog/types.ts";
-import { formatReplyMarker, parseReference, parseReplyMarker } from "./marker.ts";
+import { formatReplyMarker, isWithdrawal, parseReference, parseReplyMarker } from "./marker.ts";
 import { buildThreads } from "./thread.ts";
 
 const ME = 1;
@@ -59,6 +59,15 @@ describe("marker", () => {
     }
     for (const text of ["RC-123 済みではないです", "RC-123 ✖", "RC-123 まだです ✅", "RC-123 :x:"]) {
       assert.equal(parseReference(text)?.resolved, false, text);
+    }
+  });
+
+  test("取り下げは、解決の印の直後の「対応不要」で見分ける（§7-16）", () => {
+    for (const text of ["RC-123 ✅ 対応不要", "RC-123✅対応不要です", "ＲＣ－１２３ :white_check_mark: 対応不要\n理由", "RC-123#1 ☑️ 対応不要"]) {
+      assert.equal(isWithdrawal(text), true, text);
+    }
+    for (const text of ["RC-123 ✅", "RC-123 ✅ 確認しました。対応不要でした", "RC-123 対応不要", "対応不要 RC-123 ✅"]) {
+      assert.equal(isWithdrawal(text), false, text);
     }
   });
 });

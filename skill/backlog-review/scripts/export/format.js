@@ -7,11 +7,13 @@ import { cell } from "../reply/format.js";
 import { escapeQuoted } from "../thread/marker.js";
 import { CATEGORIES, categoryLabel } from "../thread/category.js";
 import { sanitizeForTerminal } from "../text.js";
-const RESPONSE_LABEL = {
+/** 対応区分の表示（§5-2）。サマリーの resolved に添える決着（§4-5）にも使う */
+export const OUTCOME_LABEL = {
     fixed: "修正",
     answered: "回答",
     needs_info: "確認中",
     wontfix: "見送り",
+    withdrawn: "取り下げ",
 };
 const STATUSES = ["open", "needs_info", "fixed", "answered", "wontfix", "resolved", "not_actionable"];
 export const SECRET_OMITTED = "（秘密情報らしき文字列のため省略）";
@@ -101,7 +103,7 @@ const COLUMNS = [
     ["本文", (r) => r.body],
     ["場所", (r) => formatRecordLocation(r)],
     ["状態", (r) => r.status],
-    ["対応区分", (r) => (r.lastReplyStatus ? RESPONSE_LABEL[r.lastReplyStatus] : "")],
+    ["対応区分", (r) => (r.outcome ? OUTCOME_LABEL[r.outcome] : "")],
     ["対応内容", (r) => r.response ?? ""],
     ["やり取り", (r, o, k) => formatHistory(r.history, { apiKey: k, offsetMinutes: o })],
     ["コミット", (r) => r.commits.join(", ")],
@@ -199,7 +201,7 @@ export function formatMarkdown(result, meta) {
             md(r.summary),
             md(formatRecordLocation(r)),
             r.status,
-            r.lastReplyStatus ? RESPONSE_LABEL[r.lastReplyStatus] : "",
+            r.outcome ? OUTCOME_LABEL[r.outcome] : "",
             r.commits.join(", "),
             formatTime(r.resolvedAt, meta.offsetMinutes),
         ].join(" | ")} |`);

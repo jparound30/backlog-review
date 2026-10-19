@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { BacklogApiError } from "../backlog/client.ts";
 import type { PullRequestRef } from "../backlog/url.ts";
 import { collectRecords, type ExportContext } from "../export/command.ts";
+import { OUTCOME_LABEL } from "../export/format.ts";
 import type { ExportRecord } from "../export/record.ts";
 import { formatSummary, type SummaryRow } from "../reply/format.ts";
 import { hasSummaryMarker, SUMMARY_MARKER_TEXT } from "../thread/marker.ts";
@@ -39,6 +40,8 @@ function toRows(records: ExportRecord[]): SummaryRow[] {
     commits: r.commits,
     rootId: r.rootId,
     latestReplyId: r.lastReplyId,
+    // 完了した指摘の決着（§7-16）。確認中（needs_info）のまま解決したものは添えない
+    outcome: r.status === "resolved" && r.outcome && r.outcome !== "needs_info" ? OUTCOME_LABEL[r.outcome] : null,
   }));
 }
 
