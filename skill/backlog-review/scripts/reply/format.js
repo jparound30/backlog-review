@@ -135,7 +135,7 @@ export const NEXT_STEPS = [
     "- ✅ fixed → 確認して問題なければ `RC-番号 ✅`、直っていなければ `RC-番号 理由`",
     "- ❓ needs_info → `RC-番号 回答` で答える",
     "- :speech_balloon: answered / :no_good: wontfix → 納得なら `RC-番号 ✅`、そうでなければ `RC-番号 理由`",
-    "- ☑️ resolved → 完了（何もしなくてよい）",
+    "- ☑️ resolved → 完了（何もしなくてよい。括弧の中はどう決着したか）",
     "- 対応不要にする → `RC-番号 ✅ 対応不要`",
     "- 新しく指摘する → 行コメントで付ける（または `場所: ファイル L行`）。1 コメントに 1 指摘",
 ];
@@ -165,7 +165,8 @@ export function formatSummary(rows, now = new Date(), options = {}) {
             const commits = shas.length > 0 ? shas.map((sha) => sha.slice(0, 7)).join(", ") : "-";
             const rc = commentLink(label(r.key), r.rootId);
             const latest = r.latestReplyId ? commentLink(`#${r.latestReplyId}`, r.latestReplyId) : "-";
-            lines.push(`| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${SUMMARY_STATUS_LABEL[r.status]} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`);
+            const status = SUMMARY_STATUS_LABEL[r.status] + (r.status === "resolved" && r.outcome ? `（${cell(r.outcome)}）` : "");
+            lines.push(`| ${rc} | ${cell(r.reviewerName)} | ${cell(r.summary, Infinity)} | ${status} | ${formatLocation(r.location).replace(/\|/g, "\\|")} | ${commits} | ${latest} |`);
         }
     }
     // マーカーは最後の行でないと働かないので、「次にすること」はその前に置く（§6-1）

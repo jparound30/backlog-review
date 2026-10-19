@@ -11,10 +11,13 @@ import type { StoredInterpretation } from "../interpret/interpretation.ts";
 import { firstLine, parseReplyBody, parseReplyFields, type ReplyLocation } from "../reply/format.ts";
 import { parseFindingMarker, type FindingSeverity } from "../review/finding.ts";
 import { type Category, parseCategoryLine } from "../thread/category.ts";
-import { hasSummaryMarker, label, type ReplyStatus } from "../thread/marker.ts";
+import { hasSummaryMarker, isWithdrawal, label, type ReplyStatus } from "../thread/marker.ts";
 import { buildThreads, type ItemStatus } from "../thread/thread.ts";
 
 export type RecordSource = "human" | "auto_review";
+
+/** どう対応・決着したか（§5-2 の対応区分, §7-16）。取り下げ（`RC-番号 ✅ 対応不要`）か、最後の自動返信の状態 */
+export type Outcome = ReplyStatus | "withdrawn";
 
 /** 指摘のやり取りの 1 件（§5-2 の「やり取り」）。コメントの順（時系列） */
 export type HistoryItem = {
@@ -45,6 +48,8 @@ export type ExportRecord = {
   status: ItemStatus;
   /** 最後の自動返信の状態 */
   lastReplyStatus: ReplyStatus | null;
+  /** どう対応・決着したか（対応区分）。返信も取り下げもなければ null */
+  outcome: Outcome | null;
   /** 最後の自動返信の本文の項目（対応内容・回答など） */
   response: string | null;
   commits: string[];
@@ -186,6 +191,7 @@ export async function buildRecords(input: ExportInput): Promise<ExportResult> {
       location,
       status: item.status,
       lastReplyStatus: last?.status ?? null,
+      outcome: resolveComment && isWithdrawal(resolveComment.content ?? "") ? "withdrawn" : (last?.status ?? null),
       response: last ? parseReplyBody(last.comment.content ?? "") : null,
       commits,
       lastReplyAt: last?.comment.created ?? null,

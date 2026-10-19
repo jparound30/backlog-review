@@ -11,7 +11,8 @@ import { formatReply, parseReplyBody } from "../reply/format.ts";
 import { SUMMARY_MARKER_TEXT } from "../thread/marker.ts";
 import { formatFinding, formatNoFindings } from "../review/finding.ts";
 import { exportCommand, type ExportContext } from "./command.ts";
-import { csvCell, formatTime, SECRET_OMITTED } from "./format.ts";
+import { csvCell, formatTime, OUTCOME_LABEL, SECRET_OMITTED } from "./format.ts";
+import { buildRecords } from "./record.ts";
 
 const PR = { space: "x.backlog.jp", projectKey: "P", repoName: "r", number: 1 };
 const AUTHOR = 1; // PR の作成者（対応側）
@@ -318,5 +319,42 @@ describe("export（§5-2, M16）", () => {
     const { csv } = await run("fix");
     assert.match(row(csv, "RC-80")!, /"answered","回答","答えます"/);
     comments = saved;
+  });
+});
+
+describe("対応区分と決着（§5-2, §7-16）", () => {
+  const records = async (comments: BacklogComment[]) =>
+    (
+      await buildRecords({
+        pr: PR,
+        prUrl: "https://x.backlog.jp/git/P/r/pullRequests/1",
+        comments,
+        myselfId: AUTHOR,
+        locate: async () => null,
+        interpretations: new Map(),
+        stateCommits: {},
+        all: false,
+      })
+    ).records;
+  const wontfix = (key: string) =>
+    formatReply({ key, replyTo: Number(key), reviewerName: "user2", quoteSource: "q", status: "wontfix", location: null, body: "影響がないため", commits: [] });
+
+  test("見送りを解決しても、状態は resolved のまま、対応区分は見送りに残る", async () => {
+    const [r] = await records([comment(10, REVIEWER, "ログを足して"), comment(11, AUTHOR, wontfix("10")), comment(12, REVIEWER, "RC-10 ✅")]);
+    assert.equal(r.status, "resolved");
+    assert.equal(r.outcome, "wontfix");
+    assert.equal(OUTCOME_LABEL[r.outcome!], "見送り");
+  });
+
+  test("`RC-番号 ✅ 対応不要` で解決したものは取り下げ。返信の前でも後でも", async () => {
+    const rs = await records([
+      comment(10, REVIEWER, "ログを足して"),
+      comment(11, REVIEWER, "RC-10 ✅ 対応不要"),
+      comment(20, REVIEWER, "名前を変えて"),
+      comment(21, AUTHOR, wontfix("20")),
+      comment(22, REVIEWER, "ＲＣ－２０ ✅対応不要です"),
+      comment(30, REVIEWER, "テストを足して"),
+    ]);
+    assert.deepEqual(rs.map((r) => [r.status, r.outcome]), [["resolved", "withdrawn"], ["resolved", "withdrawn"], ["open", null]]);
   });
 });

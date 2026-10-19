@@ -6,16 +6,17 @@ import { containsApiKey, findSecretPattern } from "../backlog/secrets.ts";
 import { cell } from "../reply/format.ts";
 import { escapeQuoted } from "../thread/marker.ts";
 import { CATEGORIES, categoryLabel } from "../thread/category.ts";
-import type { ReplyStatus } from "../thread/marker.ts";
 import type { ItemStatus } from "../thread/thread.ts";
 import { sanitizeForTerminal } from "../text.ts";
-import type { ExportRecord, ExportResult, HistoryItem } from "./record.ts";
+import type { ExportRecord, ExportResult, HistoryItem, Outcome } from "./record.ts";
 
-const RESPONSE_LABEL: Record<ReplyStatus, string> = {
+/** 対応区分の表示（§5-2）。サマリーの resolved に添える決着（§4-5）にも使う */
+export const OUTCOME_LABEL: Record<Outcome, string> = {
   fixed: "修正",
   answered: "回答",
   needs_info: "確認中",
   wontfix: "見送り",
+  withdrawn: "取り下げ",
 };
 
 const STATUSES: ItemStatus[] = ["open", "needs_info", "fixed", "answered", "wontfix", "resolved", "not_actionable"];
@@ -117,7 +118,7 @@ const COLUMNS: Array<[string, (r: ExportRecord, offset?: number, apiKey?: string
   ["本文", (r) => r.body],
   ["場所", (r) => formatRecordLocation(r)],
   ["状態", (r) => r.status],
-  ["対応区分", (r) => (r.lastReplyStatus ? RESPONSE_LABEL[r.lastReplyStatus] : "")],
+  ["対応区分", (r) => (r.outcome ? OUTCOME_LABEL[r.outcome] : "")],
   ["対応内容", (r) => r.response ?? ""],
   ["やり取り", (r, o, k) => formatHistory(r.history, { apiKey: k, offsetMinutes: o })],
   ["コミット", (r) => r.commits.join(", ")],
@@ -238,7 +239,7 @@ export function formatMarkdown(result: ExportResult, meta: MarkdownMeta): string
         md(r.summary),
         md(formatRecordLocation(r)),
         r.status,
-        r.lastReplyStatus ? RESPONSE_LABEL[r.lastReplyStatus] : "",
+        r.outcome ? OUTCOME_LABEL[r.outcome] : "",
         r.commits.join(", "),
         formatTime(r.resolvedAt, meta.offsetMinutes),
       ].join(" | ")} |`,
