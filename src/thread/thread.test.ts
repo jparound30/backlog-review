@@ -63,10 +63,10 @@ describe("marker", () => {
   });
 
   test("取り下げは、解決の印の直後の「対応不要」で見分ける（§7-16）", () => {
-    for (const text of ["RC-123 ✅ 対応不要", "RC-123✅対応不要です", "ＲＣ－１２３ :white_check_mark: 対応不要\n理由", "RC-123#1 ☑️ 対応不要"]) {
+    for (const text of ["RC-123 ✅ 対応不要", "RC-123✅対応不要です", "ＲＣ－１２３ :white_check_mark: 対応不要\n理由", "RC-123#1 ☑️ 対応不要", "RC-123 ✅ 修正不要", "RC-123✅修正不要です"]) {
       assert.equal(isWithdrawal(text), true, text);
     }
-    for (const text of ["RC-123 ✅", "RC-123 ✅ 確認しました。対応不要でした", "RC-123 対応不要", "対応不要 RC-123 ✅"]) {
+    for (const text of ["RC-123 ✅", "RC-123 ✅ 確認しました。対応不要でした", "RC-123 対応不要", "RC-123 修正不要", "対応不要 RC-123 ✅", "RC-123 ✅ 修正は不要"]) {
       assert.equal(isWithdrawal(text), false, text);
     }
   });

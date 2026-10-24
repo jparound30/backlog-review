@@ -93,7 +93,7 @@ export function parseReference(content) {
     return { id: Number(m[1]), resolved: RESOLVED_MARK.test(m[2]) };
 }
 /**
- * 解決のコメントが取り下げ（`RC-123 ✅ 対応不要`, §4-2）かどうか。
+ * 解決のコメントが取り下げ（`RC-123 ✅ 対応不要`。`修正不要` も, §4-2）かどうか。
  * 表示と記録の「どう決着したか」にだけ使い、状態は変えない（§7-16）
  */
 export function isWithdrawal(content) {
@@ -102,5 +102,5 @@ export function isWithdrawal(content) {
     if (!m)
         return false;
     const mark = RESOLVED_MARK.exec(m[1]);
-    return mark !== null && /^[\s\uFE0F]*対応不要/.test(m[1].slice(mark[0].length));
+    return mark !== null && /^[\s\uFE0F]*(?:対応|修正)不要/.test(m[1].slice(mark[0].length));
 }

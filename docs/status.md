@@ -38,7 +38,7 @@ stateDiagram-v2
     replied --> open: RC-番号 理由・回答<br/>（✅ なし）
     replied --> resolved: RC-番号 ✅
 
-    open --> resolved: RC-番号 ✅ 対応不要<br/>（取り下げ）
+    open --> resolved: RC-番号 ✅ 対応不要<br/>（取り下げ。修正不要も）
     not_actionable --> open: ローカルの解釈が消える<br/>・新しいコメント
 
     resolved --> open: RC-番号 …（✅ なし）<br/>で再び指摘
@@ -66,7 +66,7 @@ stateDiagram-v2
 
 | 決着 | 決め方 | サマリー | 記録の対応区分 |
 |---|---|---|---|
-| 取り下げ | 解決のコメントが `RC-番号 ✅ 対応不要` | ☑️ resolved（取り下げ） | 取り下げ |
+| 取り下げ | 解決のコメントが `RC-番号 ✅ 対応不要`（`✅ 修正不要` も） | ☑️ resolved（取り下げ） | 取り下げ |
 | 修正 | 最後の自動返信が `fixed` | ☑️ resolved（修正） | 修正 |
 | 回答 | 最後の自動返信が `answered` | ☑️ resolved（回答） | 回答 |
 | 見送り | 最後の自動返信が `wontfix` | ☑️ resolved（見送り） | 見送り |
